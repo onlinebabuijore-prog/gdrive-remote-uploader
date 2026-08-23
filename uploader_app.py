@@ -89,9 +89,27 @@ class ModernGDriveUploaderApp(ctk.CTk):
         )
         self.paste_btn.grid(row=0, column=1)
 
+        # Destination row
+        self.dest_box = ctk.CTkFrame(self.input_card, fg_color="transparent")
+        self.dest_box.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 8))
+        self.dest_box.grid_columnconfigure(1, weight=1)
+
+        self.dest_lbl = ctk.CTkLabel(self.dest_box, text="🎯 Destination:", font=ctk.CTkFont(size=12), text_color="#cbd5e1")
+        self.dest_lbl.grid(row=0, column=0, padx=(0, 10), sticky="w")
+
+        self.dest_var = ctk.StringVar(value="Google Drive")
+        self.dest_seg = ctk.CTkSegmentedButton(
+            self.dest_box,
+            values=["Google Drive", "Google Photos"],
+            variable=self.dest_var,
+            selected_color="#16a34a",
+            command=self.on_dest_changed
+        )
+        self.dest_seg.grid(row=0, column=1, sticky="ew")
+
         # Folder row
         self.folder_box = ctk.CTkFrame(self.input_card, fg_color="transparent")
-        self.folder_box.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 12))
+        self.folder_box.grid(row=3, column=0, sticky="ew", padx=15, pady=(0, 12))
         self.folder_box.grid_columnconfigure(1, weight=1)
 
         self.folder_lbl = ctk.CTkLabel(self.folder_box, text="📂 Target Folder:", font=ctk.CTkFont(size=12), text_color="#cbd5e1")
@@ -231,13 +249,28 @@ class ModernGDriveUploaderApp(ctk.CTk):
             else:
                 badges[i].configure(text=f"{titles[i]}\n[ Waiting ]", fg_color="#1e293b", text_color="#64748b")
 
+    def on_dest_changed(self, value):
+        if value == "Google Photos":
+            self.folder_lbl.configure(text="🖼️ Album Name:")
+            self.folder_entry.delete(0, "end")
+            self.folder_entry.insert(0, "Cloud_Uploads")
+            self.upload_btn.configure(text="🚀 Start Remote Upload to Google Photos", fg_color="#2563eb", hover_color="#1d4ed8")
+            self.dest_seg.configure(selected_color="#2563eb")
+        else:
+            self.folder_lbl.configure(text="📂 Target Folder:")
+            self.folder_entry.delete(0, "end")
+            self.folder_entry.insert(0, "Remote_Uploads")
+            self.upload_btn.configure(text="🚀 Start Remote Upload to Google Drive", fg_color="#16a34a", hover_color="#15803d")
+            self.dest_seg.configure(selected_color="#16a34a")
+
     def start_upload_thread(self):
         url = self.url_entry.get().strip()
         if not url:
             messagebox.showwarning("Warning", "Please enter a download URL!")
             return
         
-        folder = self.folder_entry.get().strip() or "Remote_Uploads"
+        dest = "gphotos" if self.dest_var.get() == "Google Photos" else "gdrive"
+        folder = self.folder_entry.get().strip() or ("Cloud_Uploads" if dest == "gphotos" else "Remote_Uploads")
         self.upload_btn.configure(state="disabled")
         self.is_running = True
         self.elapsed_sec = 0
@@ -247,7 +280,7 @@ class ModernGDriveUploaderApp(ctk.CTk):
         self.status_label.configure(text="⏳ Triggering Cloud Runner...", text_color="#38bdf8")
 
         threading.Thread(target=self.timer_loop, daemon=True).start()
-        threading.Thread(target=self.run_upload, args=(url, folder), daemon=True).start()
+        threading.Thread(target=self.run_upload, args=(url, dest, folder), daemon=True).start()
 
     def timer_loop(self):
         while self.is_running:
@@ -263,18 +296,19 @@ class ModernGDriveUploaderApp(ctk.CTk):
             elif self.elapsed_sec > 28 and self.elapsed_sec <= 55:
                 self.set_badge_state("done", "done", "active", "waiting")
                 self.progress_bar.set(0.75)
-                self.status_label.configure(text="☁️ Uploading directly to Google Drive...", text_color="#38bdf8")
+                dest_name = "Google Photos" if self.dest_var.get() == "Google Photos" else "Google Drive"
+                self.status_label.configure(text=f"☁️ Uploading directly to {dest_name}...", text_color="#38bdf8")
             elif self.elapsed_sec > 55:
                 self.set_badge_state("done", "done", "done", "active")
                 self.progress_bar.set(0.90)
-                self.status_label.configure(text="🔗 Generating Public Share Link...", text_color="#38bdf8")
+                self.status_label.configure(text="🔗 Generating Link & Finalizing...", text_color="#38bdf8")
 
             self.timer_label.configure(text=f"Speed: ~120 MB/s | Elapsed: {m:02d}:{s:02d}")
 
-    def run_upload(self, url, folder):
+    def run_upload(self, url, dest, folder):
         try:
             # 1. Trigger GitHub Workflow via gh CLI
-            cmd = ["gh", "workflow", "run", "upload.yml", "-f", f"url={url}", "-f", f"folder={folder}", "--repo", REPO_NAME]
+            cmd = ["gh", "workflow", "run", "upload.yml", "-f", f"url={url}", "-f", f"destination={dest}", "-f", f"folder={folder}", "--repo", REPO_NAME]
             res = subprocess.run(cmd, capture_output=True, text=True)
             if res.returncode != 0:
                 self.handle_err(f"Workflow Trigger Error: {res.stderr}")
