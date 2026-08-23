@@ -14,7 +14,12 @@ on:
 jobs:
   upload:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -35,7 +40,6 @@ jobs:
         run: |
           mkdir -p ~/.config/rclone
           echo "$RCLONE_B64" | base64 -d > ~/.config/rclone/rclone.conf
-          # Verify rclone config syntax
           rclone listremotes
 
       - name: Download File from URL
@@ -44,7 +48,6 @@ jobs:
           echo "Starting high-speed download..."
           URL="${{ github.event.inputs.url }}"
           
-          # Try aria2c with standard DNS resolution
           if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
             echo "Downloaded successfully with aria2c"
           else
@@ -72,7 +75,7 @@ jobs:
           SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER/$FILENAME")
           echo "PUBLIC_LINK=$SHARE_LINK"
           
-          # Extract Google Drive File ID from link for direct download
+          # Extract Google Drive File ID
           FILE_ID=$(echo "$SHARE_LINK" | sed -n 's/.*id=\([^&]*\).*/\1/p')
           if [ -z "$FILE_ID" ]; then
             FILE_ID=$(echo "$SHARE_LINK" | sed -n 's/.*\/d\/\([^/]*\).*/\1/p')
@@ -84,10 +87,6 @@ jobs:
             DIRECT_LINK="$SHARE_LINK"
           fi
 
-          echo "FILE_NAME=$FILENAME" >> $GITHUB_OUTPUT
-          echo "SHARE_LINK=$SHARE_LINK" >> $GITHUB_OUTPUT
-          echo "DIRECT_LINK=$DIRECT_LINK" >> $GITHUB_OUTPUT
-
           # GitHub Job Summary
           echo "## 🚀 Upload Completed Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "- **📁 File Name:** \`$FILENAME\`" >> $GITHUB_STEP_SUMMARY
@@ -95,20 +94,20 @@ jobs:
           echo "- **🔗 Public Share Link:** [$SHARE_LINK]($SHARE_LINK)" >> $GITHUB_STEP_SUMMARY
           echo "- **⚡ Direct Download Link:** [$DIRECT_LINK]($DIRECT_LINK)" >> $GITHUB_STEP_SUMMARY
 
-          # Store in JSON result for Desktop App
-          mkdir -p ./result
-          cat <<EOF > ./result/result.json
+          # Publish to result.json in repo
+          cat <<EOF > result.json
           {
             "status": "success",
             "filename": "$FILENAME",
             "folder": "$TARGET_FOLDER",
             "share_link": "$SHARE_LINK",
-            "direct_link": "$DIRECT_LINK"
+            "direct_link": "$DIRECT_LINK",
+            "timestamp": "$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
           }
           EOF
 
-      - name: Upload Result Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: upload-result
-          path: ./result/result.json
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add result.json
+          git commit -m "Update upload result: $FILENAME [skip ci]" || true
+          git push origin main || true
