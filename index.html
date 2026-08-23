@@ -170,12 +170,23 @@
         function getPatToken() { return localStorage.getItem('gdrive_uploader_pat') || ''; }
         function loadPatToken() {
             const token = getPatToken();
-            document.getElementById('patStatusBadge').innerHTML = token ? '<span class="text-emerald-400">● Connected</span>' : '<span class="text-amber-400">● Set Token</span>';
-            if (token) document.getElementById('modalPatInput').value = token;
+            if (token) {
+                document.getElementById('patStatusBadge').innerHTML = '<span class="text-emerald-400">● Connected</span>';
+                document.getElementById('modalPatInput').value = token;
+            } else {
+                document.getElementById('patStatusBadge').innerHTML = '<span class="text-amber-400">● Set PAT Token</span>';
+            }
         }
         function savePatToken() {
             const token = document.getElementById('modalPatInput').value.trim();
-            if (token) { localStorage.setItem('gdrive_uploader_pat', token); loadPatToken(); toggleSettingsModal(); showToast('Token Saved!', 'success'); }
+            if (token) { 
+                localStorage.setItem('gdrive_uploader_pat', token); 
+                loadPatToken(); 
+                toggleSettingsModal(); 
+                showToast('Token Saved Successfully!', 'success'); 
+            } else {
+                showToast('Please enter a valid token!', 'error');
+            }
         }
         function toggleSettingsModal() { document.getElementById('settingsModal').classList.toggle('hidden'); }
         async function pasteFromClipboard() {
@@ -284,12 +295,11 @@
                 let pub = '', dir = '', fn = 'Uploaded File';
                 if(r.ok) {
                     const t = await r.text();
-                    const m1 = t.match(/PUBLIC_LINK=(https:\/\/drive\.google\.com\/[^
-]+)/); if(m1) pub = m1[1].trim();
-                    const m2 = t.match(/DIRECT_LINK=(https:\/\/drive\.google\.com\/[^
-]+)/); if(m2) dir = m2[1].trim();
-                    const m3 = t.match(/FILE_NAME=([^
-]+)/); if(m3) fn = m3[1].trim();
+                    for(let line of t.split('\n')) {
+                        if(line.includes('PUBLIC_LINK=')) pub = line.split('PUBLIC_LINK=')[1].trim();
+                        if(line.includes('DIRECT_LINK=')) dir = line.split('DIRECT_LINK=')[1].trim();
+                        if(line.includes('FILE_NAME=')) fn = line.split('FILE_NAME=')[1].trim();
+                    }
                 }
                 if(!pub) pub = 'https://drive.google.com/open?id=1pp_UlvRkqcDdyFTztUqYunOxs7z9XhAS';
                 document.getElementById('progressCard').classList.add('hidden');
