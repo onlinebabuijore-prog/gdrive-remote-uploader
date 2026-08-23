@@ -26,7 +26,7 @@ jobs:
       - name: Install Aria2 and Rclone
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y aria2 curl
+          sudo apt-get install -y aria2 curl wget
           curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure Rclone
@@ -38,7 +38,17 @@ jobs:
         run: |
           mkdir -p ./downloads
           echo "Starting high-speed download..."
-          aria2c -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "${{ github.event.inputs.url }}"
+          URL="${{ github.event.inputs.url }}"
+          
+          # Try aria2c with standard DNS resolution
+          if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
+            echo "Downloaded successfully with aria2c"
+          else
+            echo "aria2c failed, falling back to curl / wget..."
+            cd ./downloads
+            curl -L -O -J "$URL" || wget -c "$URL"
+            cd ..
+          fi
 
       - name: Upload to Google Drive and Generate Public Link
         id: gdrive_upload
