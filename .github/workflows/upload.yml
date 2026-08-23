@@ -1,0 +1,100 @@
+﻿name: Remote URL to Google Drive
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Remote Download URL'
+        required: true
+      folder:
+        description: 'Google Drive Folder Name'
+        required: false
+        default: 'Remote_Uploads'
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      - name: Install Aria2 and Rclone
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y aria2 curl
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Configure Rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF }}" > ~/.config/rclone/rclone.conf
+
+      - name: Download File from URL
+        run: |
+          mkdir -p ./downloads
+          echo "Starting high-speed download..."
+          aria2c -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "${{ github.event.inputs.url }}"
+
+      - name: Upload to Google Drive and Generate Public Link
+        id: gdrive_upload
+        run: |
+          TARGET_FOLDER="${{ github.event.inputs.folder }}"
+          if [ -z "$TARGET_FOLDER" ]; then
+            TARGET_FOLDER="Remote_Uploads"
+          fi
+
+          FILENAME=$(ls ./downloads | head -n 1)
+          echo "Processing file: $FILENAME"
+
+          # Upload file to Google Drive
+          rclone copy "./downloads/$FILENAME" "gdrive:$TARGET_FOLDER" --drive-chunk-size 64M -P
+
+          # Generate Public Share Link
+          SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER/$FILENAME")
+          echo "PUBLIC_LINK=$SHARE_LINK"
+          
+          # Extract Google Drive File ID from link for direct download
+          FILE_ID=$(echo "$SHARE_LINK" | sed -n 's/.*id=\([^&]*\).*/\1/p')
+          if [ -z "$FILE_ID" ]; then
+            FILE_ID=$(echo "$SHARE_LINK" | sed -n 's/.*\/d\/\([^/]*\).*/\1/p')
+          fi
+          
+          if [ ! -z "$FILE_ID" ]; then
+            DIRECT_LINK="https://drive.google.com/uc?id=$FILE_ID&export=download"
+          else
+            DIRECT_LINK="$SHARE_LINK"
+          fi
+
+          echo "FILE_NAME=$FILENAME" >> $GITHUB_OUTPUT
+          echo "SHARE_LINK=$SHARE_LINK" >> $GITHUB_OUTPUT
+          echo "DIRECT_LINK=$DIRECT_LINK" >> $GITHUB_OUTPUT
+
+          # GitHub Job Summary
+          echo "## 🚀 Upload Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "- **📁 File Name:** \`$FILENAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **📂 Drive Folder:** \`$TARGET_FOLDER\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **🔗 Public Share Link:** [$SHARE_LINK]($SHARE_LINK)" >> $GITHUB_STEP_SUMMARY
+          echo "- **⚡ Direct Download Link:** [$DIRECT_LINK]($DIRECT_LINK)" >> $GITHUB_STEP_SUMMARY
+
+          # Store in JSON result for Desktop App
+          mkdir -p ./result
+          cat <<EOF > ./result/result.json
+          {
+            "status": "success",
+            "filename": "$FILENAME",
+            "folder": "$TARGET_FOLDER",
+            "share_link": "$SHARE_LINK",
+            "direct_link": "$DIRECT_LINK"
+          }
+          EOF
+
+      - name: Upload Result Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-result
+          path: ./result/result.json
