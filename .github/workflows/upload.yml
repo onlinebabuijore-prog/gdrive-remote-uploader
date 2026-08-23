@@ -30,9 +30,13 @@ jobs:
           curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure Rclone
+        env:
+          RCLONE_B64: ${{ secrets.RCLONE_CONF_BASE64 }}
         run: |
           mkdir -p ~/.config/rclone
-          echo "${{ secrets.RCLONE_CONF }}" > ~/.config/rclone/rclone.conf
+          echo "$RCLONE_B64" | base64 -d > ~/.config/rclone/rclone.conf
+          # Verify rclone config syntax
+          rclone listremotes
 
       - name: Download File from URL
         run: |
