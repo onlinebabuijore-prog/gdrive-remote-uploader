@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'Remote Download URL'
+        description: 'Remote Download URL or Magnet Link'
         required: true
       folder:
         description: 'Google Drive Folder Name'
@@ -42,19 +42,34 @@ jobs:
           echo "$RCLONE_B64" | base64 -d > ~/.config/rclone/rclone.conf
           rclone listremotes
 
-      - name: Download File from URL
+      - name: Download File, Torrent or Magnet from URL
         run: |
           mkdir -p ./downloads
-          echo "Starting high-speed download..."
           URL="${{ github.event.inputs.url }}"
+          echo "Starting high-speed download for: $URL"
           
-          if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
-            echo "Downloaded successfully with aria2c"
+          # Check if URL is a Magnet link or Torrent file
+          if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
+            echo "⚡ BitTorrent / Magnet Link detected!"
+            aria2c \
+              --enable-dht=true \
+              --bt-enable-lpd=true \
+              --bt-max-peers=120 \
+              --seed-time=0 \
+              --max-overall-upload-limit=1K \
+              --bt-stop-timeout=300 \
+              --summary-interval=5 \
+              -d ./downloads "$URL"
           else
-            echo "aria2c failed, falling back to curl / wget..."
-            cd ./downloads
-            curl -L -O -J "$URL" || wget -c "$URL"
-            cd ..
+            echo "⚡ Direct HTTP/HTTPS/FTP URL detected!"
+            if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
+              echo "Downloaded successfully with aria2c"
+            else
+              echo "aria2c failed, falling back to curl / wget..."
+              cd ./downloads
+              curl -L -O -J "$URL" || wget -c "$URL"
+              cd ..
+            fi
           fi
 
       - name: Upload to Google Drive and Generate Public Link
@@ -65,14 +80,25 @@ jobs:
             TARGET_FOLDER="Remote_Uploads"
           fi
 
-          FILENAME=$(ls ./downloads | head -n 1)
-          echo "Processing file: $FILENAME"
+          echo "Downloaded files:"
+          ls -la ./downloads
 
-          # Upload file to Google Drive
-          rclone copy "./downloads/$FILENAME" "gdrive:$TARGET_FOLDER" --drive-chunk-size 64M -P
+          ITEM_NAME=$(ls -1 ./downloads | head -n 1)
+          if [ -z "$ITEM_NAME" ]; then
+            echo "Error: No files downloaded!"
+            exit 1
+          fi
+
+          echo "Processing item: $ITEM_NAME"
+
+          # Upload entire downloads directory to Google Drive
+          rclone copy "./downloads" "gdrive:$TARGET_FOLDER" --drive-chunk-size 64M -P
 
           # Generate Public Share Link
-          SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER/$FILENAME")
+          SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER/$ITEM_NAME")
+          if [ -z "$SHARE_LINK" ]; then
+            SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER")
+          fi
           echo "PUBLIC_LINK=$SHARE_LINK"
           
           # Extract Google Drive File ID
@@ -89,7 +115,7 @@ jobs:
 
           # GitHub Job Summary
           echo "## 🚀 Upload Completed Successfully!" >> $GITHUB_STEP_SUMMARY
-          echo "- **📁 File Name:** \`$FILENAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **📁 Name:** \`$ITEM_NAME\`" >> $GITHUB_STEP_SUMMARY
           echo "- **📂 Drive Folder:** \`$TARGET_FOLDER\`" >> $GITHUB_STEP_SUMMARY
           echo "- **🔗 Public Share Link:** [$SHARE_LINK]($SHARE_LINK)" >> $GITHUB_STEP_SUMMARY
           echo "- **⚡ Direct Download Link:** [$DIRECT_LINK]($DIRECT_LINK)" >> $GITHUB_STEP_SUMMARY
@@ -98,7 +124,7 @@ jobs:
           cat <<EOF > result.json
           {
             "status": "success",
-            "filename": "$FILENAME",
+            "filename": "$ITEM_NAME",
             "folder": "$TARGET_FOLDER",
             "share_link": "$SHARE_LINK",
             "direct_link": "$DIRECT_LINK",
@@ -109,5 +135,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add result.json
-          git commit -m "Update upload result: $FILENAME [skip ci]" || true
+          git commit -m "Update upload result: $ITEM_NAME [skip ci]" || true
           git push origin main || true

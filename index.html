@@ -94,11 +94,14 @@
             </div>
             <form id="uploadForm" onsubmit="handleStartUpload(event)" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-semibold mb-2 flex justify-between">
-                        <span><i class="fa-solid fa-link text-emerald-400 mr-2"></i>Remote Download URL:</span>
+                    <label class="block text-sm font-semibold mb-2 flex justify-between items-center">
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-link text-emerald-400"></i> Remote URL or Magnet Link:
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">HTTP / Torrent / Magnet</span>
+                        </span>
                         <button type="button" onclick="pasteFromClipboard()" class="text-xs text-emerald-400 hover:underline"><i class="fa-regular fa-paste"></i> Paste</button>
                     </label>
-                    <input type="url" id="remoteUrl" required placeholder="https://example.com/large-file.zip" class="glass-input w-full px-4 py-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <input type="text" id="remoteUrl" required placeholder="https://example.com/file.zip or magnet:?xt=urn:btih:..." class="glass-input w-full px-4 py-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-2"><i class="fa-solid fa-folder text-blue-400 mr-2"></i>Drive Target Folder:</label>

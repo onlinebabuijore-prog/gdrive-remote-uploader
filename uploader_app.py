@@ -58,7 +58,7 @@ class ModernGDriveUploaderApp(ctk.CTk):
 
         self.url_label = ctk.CTkLabel(
             self.input_card, 
-            text="🔗 Remote File URL:", 
+            text="🔗 Remote File URL or Magnet Link (HTTP / Torrent / Magnet):", 
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color="#e2e8f0"
         )
@@ -70,7 +70,7 @@ class ModernGDriveUploaderApp(ctk.CTk):
 
         self.url_entry = ctk.CTkEntry(
             self.url_input_box,
-            placeholder_text="https://example.com/file.zip (Direct or Remote URL)",
+            placeholder_text="https://example.com/file.zip or magnet:?xt=urn:btih:...",
             height=42,
             font=ctk.CTkFont(family="Consolas", size=12),
             fg_color="#0b0f19",
