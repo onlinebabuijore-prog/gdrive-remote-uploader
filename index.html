@@ -503,6 +503,29 @@
         async function monitorJob(runId, token) {
             const poll = setInterval(async () => {
                 try {
+                    // Poll live runner steps
+                    const jobRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/jobs`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (jobRes.ok) {
+                        const jobData = await jobRes.json();
+                        if (jobData.jobs && jobData.jobs.length > 0) {
+                            const steps = jobData.jobs[0].steps || [];
+                            for (const step of steps) {
+                                if (step.name.includes("Download") && step.status === "in_progress") {
+                                    updateStep(2, 'Active ⚡');
+                                    document.getElementById('liveStatusTitle').innerText = 'Downloading from Remote / Seeders...';
+                                    document.getElementById('liveStatusSubtitle').innerText = 'Aria2c High-Speed Cloud Transfer in progress';
+                                } else if (step.name.includes("Upload") && step.status === "in_progress") {
+                                    updateStep(3, 'Uploading ☁️');
+                                    document.getElementById('liveStatusTitle').innerText = 'Uploading directly to Cloud Storage...';
+                                    document.getElementById('liveStatusSubtitle').innerText = 'Streaming files to your Google Drive / Photos';
+                                    document.getElementById('progressBarFill').style.width = '88%';
+                                }
+                            }
+                        }
+                    }
+
                     const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
