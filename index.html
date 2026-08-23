@@ -230,9 +230,23 @@
                 const m = String(Math.floor(elapsedSeconds/60)).padStart(2,'0');
                 const s = String(elapsedSeconds%60).padStart(2,'0');
                 document.getElementById('elapsedTimer').innerText = `${m}:${s}`;
-                if(elapsedSeconds > 8 && elapsedSeconds <= 28) { updateStep(2, '120 MB/s'); document.getElementById('progressBarFill').style.width = '45%'; }
-                else if(elapsedSeconds > 28 && elapsedSeconds <= 55) { updateStep(3, 'Uploading...'); document.getElementById('progressBarFill').style.width = '75%'; }
-                else if(elapsedSeconds > 55) { updateStep(4, 'Linking...'); document.getElementById('progressBarFill').style.width = '90%'; }
+                if(elapsedSeconds > 8 && elapsedSeconds <= 28) { 
+                    updateStep(2, '120 MB/s'); 
+                    document.getElementById('liveStatusTitle').innerText = 'Downloading via Aria2c (16-Threads)...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Microsoft Azure Gigabit Network Transfer';
+                    document.getElementById('progressBarFill').style.width = '45%'; 
+                }
+                else if(elapsedSeconds > 28 && elapsedSeconds <= 55) { 
+                    updateStep(3, 'Uploading...'); 
+                    document.getElementById('liveStatusTitle').innerText = 'Uploading to Google Drive...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Direct stream to your Google Drive Cloud';
+                    document.getElementById('progressBarFill').style.width = '75%'; 
+                }
+                else if(elapsedSeconds > 55) { 
+                    updateStep(4, 'Linking...'); 
+                    document.getElementById('liveStatusTitle').innerText = 'Generating Public Share Link...';
+                    document.getElementById('progressBarFill').style.width = '90%'; 
+                }
             }, 1000);
 
             updateStep(1, 'Triggering...');
@@ -289,18 +303,17 @@
             updateStep(5, 'Completed');
             document.getElementById('progressBarFill').style.width = '100%';
             try {
-                const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/logs`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                await new Promise(r => setTimeout(r, 2000));
                 let pub = '', dir = '', fn = 'Uploaded File';
-                if(r.ok) {
-                    const t = await r.text();
-                    for(let line of t.split('\n')) {
-                        if(line.includes('PUBLIC_LINK=')) pub = line.split('PUBLIC_LINK=')[1].trim();
-                        if(line.includes('DIRECT_LINK=')) dir = line.split('DIRECT_LINK=')[1].trim();
-                        if(line.includes('FILE_NAME=')) fn = line.split('FILE_NAME=')[1].trim();
-                    }
+
+                const res = await fetch(`https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/result.json?t=${Date.now()}`);
+                if(res.ok) {
+                    const data = await res.json();
+                    if(data.share_link) pub = data.share_link;
+                    if(data.direct_link) dir = data.direct_link;
+                    if(data.filename) fn = data.filename;
                 }
+
                 if(!pub) pub = 'https://drive.google.com/open?id=1pp_UlvRkqcDdyFTztUqYunOxs7z9XhAS';
                 document.getElementById('progressCard').classList.add('hidden');
                 document.getElementById('successCard').classList.remove('hidden');
@@ -311,7 +324,7 @@
                 document.getElementById('openDriveBtn').href = pub;
                 saveHistory({ filename: fn, publicLink: pub, date: new Date().toLocaleTimeString() });
                 showToast('Upload Successful!', 'success');
-            } catch(e) { showToast('Error parsing output: ' + e.message, 'error'); }
+            } catch(e) { showToast('Error fetching output: ' + e.message, 'error'); }
         }
         function resetUploader() {
             document.getElementById('remoteUrl').value = '';
