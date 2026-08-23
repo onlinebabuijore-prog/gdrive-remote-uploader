@@ -32,6 +32,36 @@
     <div class="fixed inset-0 pointer-events-none -z-10">
         <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-emerald-500/15 rounded-full blur-3xl"></div>
     </div>
+    <!-- PIN Security Lock Screen -->
+    <div id="pinLockScreen" class="fixed inset-0 bg-dark-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-sm w-full p-8 border border-emerald-500/30 shadow-2xl text-center relative glow-emerald">
+            <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-2xl mx-auto mb-4">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-1">Security PIN Required</h2>
+            <p class="text-xs text-slate-400 mb-6">Enter your 6-digit access PIN to unlock the dashboard</p>
+
+            <form onsubmit="verifyPin(event)" class="space-y-4">
+                <input 
+                    type="password" 
+                    id="pinInput" 
+                    maxlength="6" 
+                    placeholder="••••••" 
+                    class="glass-input w-full py-3.5 text-center text-2xl tracking-[0.5em] font-mono rounded-xl text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    autofocus
+                    required
+                >
+                <p id="pinErrorMsg" class="text-xs text-rose-400 font-semibold hidden"><i class="fa-solid fa-circle-exclamation mr-1"></i> Incorrect PIN! Try again.</p>
+                <button 
+                    type="submit" 
+                    class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg glow-emerald transition flex items-center justify-center gap-2"
+                >
+                    <i class="fa-solid fa-unlock"></i> Unlock Dashboard
+                </button>
+            </form>
+        </div>
+    </div>
+
     <header class="border-b border-slate-800 bg-dark-900/60 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -46,7 +76,10 @@
                     <p class="text-xs text-slate-400">Direct Remote URL to Google Drive (Zero PC Bandwidth)</p>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+                <button onclick="lockDashboard()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 border border-slate-700 text-slate-300 transition" title="Lock Dashboard">
+                    <i class="fa-solid fa-lock text-rose-400"></i> Lock
+                </button>
                 <button onclick="toggleSettingsModal()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-800 border border-slate-700 text-slate-300">
                     <i class="fa-solid fa-key text-amber-400"></i>
                     <span id="patStatusBadge">PAT Token</span>
@@ -170,7 +203,53 @@
         const WORKFLOW_FILE = 'upload.yml';
         let timerInterval = null, elapsedSeconds = 0;
 
-        document.addEventListener('DOMContentLoaded', () => { loadPatToken(); renderHistory(); });
+        const PIN_HASH = "b4ee1f8347f181f4f9bb6ff4e5a7c633c4a8a2c37999fe95af8c8ff2e94f89cd"; // 993355
+
+        async function sha256(str) {
+            const buffer = new TextEncoder().encode(str);
+            const hash = await crypto.subtle.digest('SHA-256', buffer);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function verifyPin(e) {
+            e.preventDefault();
+            const input = document.getElementById('pinInput').value.trim();
+            const hash = await sha256(input);
+            if (hash === PIN_HASH) {
+                sessionStorage.setItem('gdrive_unlocked', 'true');
+                document.getElementById('pinLockScreen').classList.add('hidden');
+                document.getElementById('pinErrorMsg').classList.add('hidden');
+                showToast('Dashboard Unlocked!', 'success');
+            } else {
+                document.getElementById('pinErrorMsg').classList.remove('hidden');
+                document.getElementById('pinInput').value = '';
+                document.getElementById('pinInput').focus();
+            }
+        }
+
+        function checkLockStatus() {
+            if (sessionStorage.getItem('gdrive_unlocked') === 'true') {
+                document.getElementById('pinLockScreen').classList.add('hidden');
+            } else {
+                document.getElementById('pinLockScreen').classList.remove('hidden');
+                const pinInput = document.getElementById('pinInput');
+                if (pinInput) setTimeout(() => pinInput.focus(), 200);
+            }
+        }
+
+        function lockDashboard() {
+            sessionStorage.removeItem('gdrive_unlocked');
+            document.getElementById('pinLockScreen').classList.remove('hidden');
+            document.getElementById('pinInput').value = '';
+            document.getElementById('pinInput').focus();
+            showToast('Dashboard Locked', 'info');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { 
+            checkLockStatus();
+            loadPatToken(); 
+            renderHistory(); 
+        });
         function getPatToken() { return localStorage.getItem('gdrive_uploader_pat') || ''; }
         function loadPatToken() {
             const token = getPatToken();
