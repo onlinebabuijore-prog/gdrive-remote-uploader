@@ -80,9 +80,8 @@
                 <button onclick="lockDashboard()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 border border-slate-700 text-slate-300 transition" title="Lock Dashboard">
                     <i class="fa-solid fa-lock text-rose-400"></i> Lock
                 </button>
-                <button onclick="toggleSettingsModal()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-800 border border-slate-700 text-slate-300">
-                    <i class="fa-solid fa-key text-amber-400"></i>
-                    <span id="patStatusBadge">PAT Token</span>
+                <button onclick="toggleSettingsModal()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 border border-slate-700 text-slate-300 transition">
+                    <i class="fa-solid fa-gear text-emerald-400"></i> Settings & PIN
                 </button>
             </div>
         </div>
@@ -179,17 +178,50 @@
             <div id="historyList" class="space-y-2"></div>
         </div>
     </main>
-    <div id="settingsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="glass-card rounded-2xl max-w-md w-full p-6 border border-slate-700 shadow-2xl">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                <h3 class="text-base font-bold flex items-center gap-2"><i class="fa-solid fa-key text-amber-400"></i> GitHub Token</h3>
-                <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-white">&times;</button>
+    <!-- Settings / Token & PIN Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-md w-full p-6 border border-slate-700 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <h3 class="text-base font-bold flex items-center gap-2 text-white">
+                    <i class="fa-solid fa-sliders text-emerald-400"></i> Settings & Security
+                </h3>
+                <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
             </div>
-            <p class="text-xs text-slate-300 mb-3">Browser theke action trigger korte Personal Access Token (PAT) dorkar:</p>
-            <input type="password" id="modalPatInput" placeholder="ghp_xxxxxxxxxxxx" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono mb-4 focus:ring-2 focus:ring-amber-500 focus:outline-none">
-            <div class="flex gap-2">
-                <button onclick="savePatToken()" class="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl">Save Token</button>
-                <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=GDriveUploaderWeb" target="_blank" class="py-2 px-3 bg-dark-700 border border-slate-600 rounded-xl text-xs text-slate-300">Generate PAT</a>
+
+            <!-- PIN Change Section -->
+            <div class="p-4 rounded-xl bg-dark-800/80 border border-slate-700/60 space-y-3">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-key"></i> Change Security PIN
+                </h4>
+                <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">Current PIN:</label>
+                    <input type="password" id="currentPinInput" placeholder="Current PIN" maxlength="6" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">New PIN (4-6 digits):</label>
+                        <input type="password" id="newPinInput" placeholder="New PIN" maxlength="6" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Confirm New PIN:</label>
+                        <input type="password" id="confirmPinInput" placeholder="Confirm PIN" maxlength="6" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                </div>
+                <button onclick="handlePinChange()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition">
+                    Update Security PIN
+                </button>
+            </div>
+
+            <!-- Token Section -->
+            <div class="p-4 rounded-xl bg-dark-800/80 border border-slate-700/60 space-y-3">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <i class="fa-brands fa-github"></i> GitHub PAT Token
+                </h4>
+                <input type="password" id="modalPatInput" placeholder="ghp_xxxxxxxxxxxx" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500">
+                <div class="flex gap-2">
+                    <button onclick="savePatToken()" class="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl">Save Token</button>
+                    <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=GDriveUploaderWeb" target="_blank" class="py-2 px-3 bg-dark-700 border border-slate-600 rounded-xl text-xs text-slate-300">Generate</a>
+                </div>
             </div>
         </div>
     </div>
@@ -203,7 +235,11 @@
         const WORKFLOW_FILE = 'upload.yml';
         let timerInterval = null, elapsedSeconds = 0;
 
-        const PIN_HASH = "b4ee1f8347f181f4f9bb6ff4e5a7c633c4a8a2c37999fe95af8c8ff2e94f89cd"; // 993355
+        const DEFAULT_PIN_HASH = "b4ee1f8347f181f4f9bb6ff4e5a7c633c4a8a2c37999fe95af8c8ff2e94f89cd"; // 993355
+
+        function getActivePinHash() {
+            return localStorage.getItem('gdrive_custom_pin_hash') || DEFAULT_PIN_HASH;
+        }
 
         async function sha256(str) {
             const buffer = new TextEncoder().encode(str);
@@ -215,7 +251,7 @@
             e.preventDefault();
             const input = document.getElementById('pinInput').value.trim();
             const hash = await sha256(input);
-            if (hash === PIN_HASH) {
+            if (hash === getActivePinHash()) {
                 sessionStorage.setItem('gdrive_unlocked', 'true');
                 document.getElementById('pinLockScreen').classList.add('hidden');
                 document.getElementById('pinErrorMsg').classList.add('hidden');
@@ -225,6 +261,41 @@
                 document.getElementById('pinInput').value = '';
                 document.getElementById('pinInput').focus();
             }
+        }
+
+        async function handlePinChange() {
+            const cur = document.getElementById('currentPinInput').value.trim();
+            const n1 = document.getElementById('newPinInput').value.trim();
+            const n2 = document.getElementById('confirmPinInput').value.trim();
+
+            if (!cur || !n1 || !n2) {
+                showToast('Please fill all PIN fields!', 'error');
+                return;
+            }
+
+            const curHash = await sha256(cur);
+            if (curHash !== getActivePinHash()) {
+                showToast('Current PIN is incorrect!', 'error');
+                return;
+            }
+
+            if (n1.length < 4 || n1.length > 6) {
+                showToast('New PIN must be 4 to 6 digits!', 'error');
+                return;
+            }
+
+            if (n1 !== n2) {
+                showToast('New PIN and Confirm PIN do not match!', 'error');
+                return;
+            }
+
+            const newHash = await sha256(n1);
+            localStorage.setItem('gdrive_custom_pin_hash', newHash);
+            document.getElementById('currentPinInput').value = '';
+            document.getElementById('newPinInput').value = '';
+            document.getElementById('confirmPinInput').value = '';
+            toggleSettingsModal();
+            showToast('Security PIN changed successfully!', 'success');
         }
 
         function checkLockStatus() {
