@@ -248,43 +248,43 @@
                         <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Video Preset / Operation:
                     </label>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer hover:border-amber-400 transition" id="presetCard1">
-                            <input type="radio" name="videoPreset" value="mp4_universal" checked onchange="handlePresetSelection('mp4_universal')" class="accent-amber-500">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer hover:border-amber-400 transition" id="presetCard1" onclick="handlePresetSelection('mp4_universal')">
+                            <input type="radio" name="videoPreset" value="mp4_universal" checked class="accent-amber-500">
                             <div>
                                 <p class="text-xs font-bold text-amber-400">🎬 Universal MP4</p>
                                 <p class="text-[10px] text-slate-400">H.264/AAC for all devices</p>
                             </div>
                         </label>
-                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard2">
-                            <input type="radio" name="videoPreset" value="compress_hevc" onchange="handlePresetSelection('compress_hevc')" class="accent-amber-500">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard2" onclick="handlePresetSelection('compress_hevc')">
+                            <input type="radio" name="videoPreset" value="compress_hevc" class="accent-amber-500">
                             <div>
                                 <p class="text-xs font-bold text-slate-300">🗜️ HEVC Compress</p>
                                 <p class="text-[10px] text-slate-400">50-70% size reduction</p>
                             </div>
                         </label>
-                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard3">
-                            <input type="radio" name="videoPreset" value="add_watermark" onchange="handlePresetSelection('add_watermark')" class="accent-amber-500">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard3" onclick="handlePresetSelection('add_watermark')">
+                            <input type="radio" name="videoPreset" value="add_watermark" class="accent-amber-500">
                             <div>
                                 <p class="text-xs font-bold text-slate-300">🏷️ Add Watermark</p>
                                 <p class="text-[10px] text-slate-400">Channel / Brand name</p>
                             </div>
                         </label>
-                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard4">
-                            <input type="radio" name="videoPreset" value="merge_videos" onchange="handlePresetSelection('merge_videos')" class="accent-amber-500">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard4" onclick="handlePresetSelection('merge_videos')">
+                            <input type="radio" name="videoPreset" value="merge_videos" class="accent-amber-500">
                             <div>
                                 <p class="text-xs font-bold text-slate-300">🔗 Merge / Join Videos</p>
                                 <p class="text-[10px] text-slate-400">Combine multiple videos</p>
                             </div>
                         </label>
-                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard5">
-                            <input type="radio" name="videoPreset" value="extract_mp3" onchange="handlePresetSelection('extract_mp3')" class="accent-amber-500">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard5" onclick="handlePresetSelection('extract_mp3')">
+                            <input type="radio" name="videoPreset" value="extract_mp3" class="accent-amber-500">
                             <div>
                                 <p class="text-xs font-bold text-slate-300">🎵 Extract MP3 Audio</p>
                                 <p class="text-[10px] text-slate-400">320kbps pure audio</p>
                             </div>
                         </label>
-                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard6">
-                            <input type="radio" name="videoPreset" value="to_720p" onchange="handlePresetSelection('to_720p')" class="accent-amber-500">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard6" onclick="handlePresetSelection('to_720p')">
+                            <input type="radio" name="videoPreset" value="to_720p" class="accent-amber-500">
                             <div>
                                 <p class="text-xs font-bold text-slate-300">📱 Scale 720p HD</p>
                                 <p class="text-[10px] text-slate-400">Fast mobile video</p>
@@ -713,6 +713,29 @@
             const convInput = document.getElementById('convSourceInput');
             const convLabel = document.getElementById('convSourceInputLabel');
             const sourceType = document.querySelector('input[name="convSourceType"]:checked')?.value || 'url';
+
+            const presetCards = {
+                'mp4_universal': 'presetCard1',
+                'compress_hevc': 'presetCard2',
+                'add_watermark': 'presetCard3',
+                'merge_videos': 'presetCard4',
+                'extract_mp3': 'presetCard5',
+                'to_720p': 'presetCard6'
+            };
+
+            for (const [key, cardId] of Object.entries(presetCards)) {
+                const card = document.getElementById(cardId);
+                const title = card?.querySelector('p.font-bold');
+                const radio = card?.querySelector('input[type="radio"]');
+                if (key === preset) {
+                    if (card) card.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer transition';
+                    if (title) title.className = 'text-xs font-bold text-amber-400';
+                    if (radio) radio.checked = true;
+                } else {
+                    if (card) card.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition';
+                    if (title) title.className = 'text-xs font-bold text-slate-300';
+                }
+            }
 
             if (preset === 'add_watermark') {
                 wmBox.classList.remove('hidden');
