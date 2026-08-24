@@ -1,29 +1,33 @@
-﻿name: Cloud Remote Uploader & Drive Folder Zipper
+﻿name: Cloud Remote Uploader, Zipper & Video Converter
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Operation Mode: remote_upload or zip_folder'
+        description: 'Operation Mode: remote_upload, zip_folder, convert_video'
         required: false
         default: 'remote_upload'
       url:
-        description: 'Remote Download URL, Magnet Link, or Public Drive Folder Link'
+        description: 'Remote Download URL, Magnet Link, or Video URL'
         required: false
       destination:
         description: 'Destination: gdrive or gphotos'
         required: false
         default: 'gdrive'
       folder:
-        description: 'Target Folder / Source Folder / Album Name'
+        description: 'Target Folder / Source Folder / Album / Drive Video Path'
         required: false
         default: 'Remote_Uploads'
       zip_name:
-        description: 'Custom Output ZIP Name (Optional)'
+        description: 'Custom Output Name (Optional)'
         required: false
       zip_password:
-        description: 'Optional ZIP Password'
+        description: 'Optional Password'
         required: false
+      video_preset:
+        description: 'Video Conversion Preset'
+        required: false
+        default: 'mp4_universal'
 
 jobs:
   process:
@@ -42,10 +46,10 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
 
-      - name: Install Aria2, Rclone, Zip and Tools
+      - name: Install Aria2, Rclone, Zip, FFmpeg and Tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y aria2 curl wget zip p7zip-full python3-pip
+          sudo apt-get install -y aria2 curl wget zip p7zip-full ffmpeg python3-pip
           pip3 install --break-system-packages gdown || pip3 install gdown || true
           curl https://rclone.org/install.sh | sudo bash
 
@@ -57,13 +61,11 @@ jobs:
           echo "$RCLONE_B64" | base64 -d > ~/.config/rclone/rclone.conf
           rclone listremotes
 
-      - name: Execute Pipeline (Remote Download or Folder ZIP)
+      - name: Execute Pipeline
         id: pipeline
         run: |
           MODE="${{ github.event.inputs.mode }}"
-          if [ -z "$MODE" ]; then
-            MODE="remote_upload"
-          fi
+          if [ -z "$MODE" ]; then MODE="remote_upload"; fi
 
           URL="${{ github.event.inputs.url }}"
           DEST="${{ github.event.inputs.destination }}"
@@ -74,20 +76,23 @@ jobs:
 
           ZIP_NAME="${{ github.event.inputs.zip_name }}"
           ZIP_PASS="${{ github.event.inputs.zip_password }}"
+          PRESET="${{ github.event.inputs.video_preset }}"
+          if [ -z "$PRESET" ]; then PRESET="mp4_universal"; fi
 
           mkdir -p ./downloads
           mkdir -p ./to_zip
+          mkdir -p ./converted
 
           echo "==========================================="
-          echo "Operation Mode: $MODE"
+          echo "Pipeline Mode: $MODE"
           echo "Destination: $DEST"
           echo "Folder / Param: $FOLDER"
+          echo "Video Preset: $PRESET"
           echo "==========================================="
 
           if [ "$MODE" = "zip_folder" ]; then
             echo "🗜️ Starting Google Drive Folder ZIP Pipeline..."
             
-            # Check if source is a public Drive URL or own Drive folder
             if [[ "$URL" =~ drive\.google\.com ]]; then
               echo "Downloading Public Google Drive Folder: $URL"
               gdown --folder "$URL" -O ./to_zip/ || rclone copy --drive-shared-with-me "gdrive:" ./to_zip/ -P || true
@@ -110,7 +115,6 @@ jobs:
 
             echo "Compressing into: $ZIP_NAME"
             if [ ! -z "$ZIP_PASS" ]; then
-              echo "Applying password protection..."
               7z a -tzip -p"$ZIP_PASS" -mhe=on "./downloads/$ZIP_NAME" ./to_zip/*
             else
               cd ./to_zip
@@ -121,19 +125,64 @@ jobs:
             ITEM_NAME="$ZIP_NAME"
             TARGET_UPLOAD_FOLDER="Remote_Uploads"
 
+          elif [ "$MODE" = "convert_video" ]; then
+            echo "🎬 Starting Cloud Video Converter & Compressor..."
+            
+            # Fetch source video
+            if [ ! -z "$URL" ]; then
+              if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
+                echo "Downloading Video from Torrent / Magnet..."
+                aria2c --enable-dht=true --bt-enable-lpd=true --bt-max-peers=120 --seed-time=0 --max-overall-upload-limit=1K --bt-stop-timeout=300 -d ./downloads "$URL"
+              else
+                echo "Downloading Video from URL..."
+                aria2c -x 16 -s 16 -k 1M -d ./downloads "$URL" || wget -P ./downloads "$URL"
+              fi
+            else
+              echo "Fetching Video from Google Drive: gdrive:$FOLDER"
+              rclone copy "gdrive:$FOLDER" ./downloads/ -P
+            fi
+
+            SRC_VIDEO=$(find ./downloads -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.avi" -o -name "*.mov" -o -name "*.webm" -o -name "*.flv" -o -name "*.ts" -o -name "*.m4v" \) | head -n 1)
+            if [ -z "$SRC_VIDEO" ]; then
+              SRC_VIDEO=$(ls -1 ./downloads | head -n 1)
+              SRC_VIDEO="./downloads/$SRC_VIDEO"
+            fi
+            echo "Source Video File: $SRC_VIDEO"
+
+            BASE_NAME=$(basename "$SRC_VIDEO" | sed 's/\.[^.]*$//')
+            
+            if [ "$PRESET" = "extract_mp3" ]; then
+              OUT_FILE="./converted/${BASE_NAME}_Audio.mp3"
+              echo "Extracting MP3 Audio (320kbps)..."
+              ffmpeg -i "$SRC_VIDEO" -vn -ar 44100 -ac 2 -b:a 320k "$OUT_FILE"
+            elif [ "$PRESET" = "compress_hevc" ]; then
+              OUT_FILE="./converted/${BASE_NAME}_Compressed.mp4"
+              echo "Applying High-Efficiency HEVC/H.265 Video Compression..."
+              ffmpeg -i "$SRC_VIDEO" -vcodec libx265 -crf 26 -preset fast -acodec aac -b:a 128k "$OUT_FILE"
+            elif [ "$PRESET" = "to_720p" ]; then
+              OUT_FILE="./converted/${BASE_NAME}_720p.mp4"
+              echo "Scaling to 720p HD MP4..."
+              ffmpeg -i "$SRC_VIDEO" -vf "scale=-2:720" -vcodec libx264 -crf 22 -preset fast -acodec aac -b:a 192k "$OUT_FILE"
+            elif [ "$PRESET" = "to_480p" ]; then
+              OUT_FILE="./converted/${BASE_NAME}_480p.mp4"
+              echo "Scaling to 480p SD MP4..."
+              ffmpeg -i "$SRC_VIDEO" -vf "scale=-2:480" -vcodec libx264 -crf 24 -preset fast -acodec aac -b:a 128k "$OUT_FILE"
+            else
+              OUT_FILE="./converted/${BASE_NAME}_Converted.mp4"
+              echo "Converting to Universal MP4 (H.264/AAC)..."
+              ffmpeg -i "$SRC_VIDEO" -vcodec libx264 -crf 21 -preset fast -acodec aac -b:a 192k "$OUT_FILE"
+            fi
+
+            rm -rf ./downloads/*
+            mv "$OUT_FILE" ./downloads/
+            ITEM_NAME=$(basename "$OUT_FILE")
+            TARGET_UPLOAD_FOLDER="Converted_Videos"
+
           else
             echo "⚡ Starting Remote Download Pipeline..."
             if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
               echo "⚡ BitTorrent / Magnet Link detected!"
-              aria2c \
-                --enable-dht=true \
-                --bt-enable-lpd=true \
-                --bt-max-peers=120 \
-                --seed-time=0 \
-                --max-overall-upload-limit=1K \
-                --bt-stop-timeout=300 \
-                --summary-interval=5 \
-                -d ./downloads "$URL"
+              aria2c --enable-dht=true --bt-enable-lpd=true --bt-max-peers=120 --seed-time=0 --max-overall-upload-limit=1K --bt-stop-timeout=300 --summary-interval=5 -d ./downloads "$URL"
             else
               echo "⚡ Direct HTTP/HTTPS/FTP URL detected!"
               if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
@@ -158,7 +207,7 @@ jobs:
           echo "Final Item to upload: $ITEM_NAME"
 
           # Upload to Cloud
-          if [ "$DEST" = "gphotos" ] && [ "$MODE" != "zip_folder" ]; then
+          if [ "$DEST" = "gphotos" ] && [ "$MODE" = "remote_upload" ]; then
             echo "Uploading to Google Photos Album: $TARGET_UPLOAD_FOLDER"
             rclone copy "./downloads" "gphotos:album/$TARGET_UPLOAD_FOLDER" -P || rclone copy "./downloads" "gphotos:upload" -P
             SHARE_LINK="https://photos.google.com/"

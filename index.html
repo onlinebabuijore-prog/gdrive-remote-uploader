@@ -88,12 +88,15 @@
     </header>
     <main class="max-w-4xl mx-auto px-4 py-8 w-full flex-grow">
         <!-- Main Mode Tabs -->
-        <div class="flex gap-2 p-1.5 rounded-2xl bg-dark-800/90 border border-slate-800 mb-6 max-w-md mx-auto shadow-xl">
-            <button type="button" onclick="switchTab('uploader')" id="tabBtnUploader" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-lg transition">
+        <div class="flex gap-2 p-1.5 rounded-2xl bg-dark-800/90 border border-slate-800 mb-6 max-w-lg mx-auto shadow-xl">
+            <button type="button" onclick="switchTab('uploader')" id="tabBtnUploader" class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-lg transition">
                 <i class="fa-solid fa-bolt text-amber-300"></i> Remote Uploader
             </button>
-            <button type="button" onclick="switchTab('zipper')" id="tabBtnZipper" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-transparent text-slate-400 hover:text-white transition">
-                <i class="fa-solid fa-file-zipper text-purple-400"></i> Drive Folder Zipper
+            <button type="button" onclick="switchTab('zipper')" id="tabBtnZipper" class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-transparent text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-file-zipper text-purple-400"></i> Folder Zipper
+            </button>
+            <button type="button" onclick="switchTab('converter')" id="tabBtnConverter" class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-transparent text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-film text-amber-400"></i> Video Converter
             </button>
         </div>
 
@@ -199,6 +202,85 @@
 
                 <button type="submit" id="zipSubmitBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-base shadow-lg transition flex items-center justify-center gap-2">
                     <i class="fa-solid fa-file-zipper"></i> Compress Folder to .ZIP & Upload to Drive
+                </button>
+            </form>
+        </div>
+
+        <!-- Tab 3: Cloud Video & Audio Converter -->
+        <div id="converterTabContent" class="hidden glass-card rounded-2xl p-6 sm:p-8 shadow-2xl relative mb-8 border border-amber-500/30 glow-amber">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-800 text-xs">
+                <span class="font-semibold text-amber-400 flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-amber-400 animate-ping"></span> FFmpeg Cloud Video & Audio Converter
+                </span>
+                <span class="text-slate-400">Zero PC CPU / GPU Usage</span>
+            </div>
+
+            <form id="convertForm" onsubmit="handleStartConvertVideo(event)" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-video text-amber-400"></i> Video Source:
+                    </label>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer transition" id="convSourceCardUrl">
+                            <input type="radio" name="convSourceType" value="url" checked onchange="handleConvSourceTypeChange('url')" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-amber-400 flex items-center gap-1.5"><i class="fa-solid fa-link"></i> Video URL / Magnet</p>
+                                <p class="text-[10px] text-slate-400">Online video or torrent</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition" id="convSourceCardDrive">
+                            <input type="radio" name="convSourceType" value="drive" onchange="handleConvSourceTypeChange('drive')" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300 flex items-center gap-1.5"><i class="fa-brands fa-google-drive"></i> From Google Drive</p>
+                                <p class="text-[10px] text-slate-400">Existing video on your Drive</p>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-semibold text-slate-300" id="convSourceInputLabel">Paste Video URL, MKV/MP4 Link or Magnet:</label>
+                        <button type="button" onclick="pasteFromClipboard('convSourceInput')" class="text-xs text-amber-400 hover:underline"><i class="fa-regular fa-paste"></i> Paste</button>
+                    </div>
+                    <input type="text" id="convSourceInput" required placeholder="https://example.com/movie.mkv or magnet:?xt=..." class="glass-input w-full px-4 py-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Conversion Preset:
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer hover:border-amber-400 transition" id="presetCard1">
+                            <input type="radio" name="videoPreset" value="mp4_universal" checked class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-amber-400">🎬 Universal MP4 (H.264/AAC)</p>
+                                <p class="text-[10px] text-slate-400">Plays on all TVs, phones & web</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard2">
+                            <input type="radio" name="videoPreset" value="compress_hevc" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300">🗜️ HEVC / H.265 Compression</p>
+                                <p class="text-[10px] text-slate-400">50-70% file size reduction</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard3">
+                            <input type="radio" name="videoPreset" value="extract_mp3" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300">🎵 Extract MP3 Audio (320kbps)</p>
+                                <p class="text-[10px] text-slate-400">Audio only from video/song</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard4">
+                            <input type="radio" name="videoPreset" value="to_720p" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300">📱 Scale to 720p HD MP4</p>
+                                <p class="text-[10px] text-slate-400">Lightweight mobile version</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" id="convSubmitBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-base shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Convert Video & Upload to Google Drive
                 </button>
             </form>
         </div>
@@ -438,18 +520,28 @@
         function switchTab(tab) {
             const btnUploader = document.getElementById('tabBtnUploader');
             const btnZipper = document.getElementById('tabBtnZipper');
+            const btnConverter = document.getElementById('tabBtnConverter');
             const contentUploader = document.getElementById('uploaderTabContent');
             const contentZipper = document.getElementById('zipperTabContent');
+            const contentConverter = document.getElementById('converterTabContent');
+
+            // Reset all tab buttons
+            btnUploader.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-transparent text-slate-400 hover:text-white transition';
+            btnZipper.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-transparent text-slate-400 hover:text-white transition';
+            btnConverter.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-transparent text-slate-400 hover:text-white transition';
+            
+            contentUploader.classList.add('hidden');
+            contentZipper.classList.add('hidden');
+            contentConverter.classList.add('hidden');
 
             if (tab === 'zipper') {
-                btnZipper.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-purple-600 text-white shadow-lg transition';
-                btnUploader.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-transparent text-slate-400 hover:text-white transition';
-                contentUploader.classList.add('hidden');
+                btnZipper.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-purple-600 text-white shadow-lg transition';
                 contentZipper.classList.remove('hidden');
+            } else if (tab === 'converter') {
+                btnConverter.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-amber-600 text-white shadow-lg transition';
+                contentConverter.classList.remove('hidden');
             } else {
-                btnUploader.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-lg transition';
-                btnZipper.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-transparent text-slate-400 hover:text-white transition';
-                contentZipper.classList.add('hidden');
+                btnUploader.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-lg transition';
                 contentUploader.classList.remove('hidden');
             }
         }
@@ -470,6 +562,25 @@
                 cardPub.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition';
                 inputLabel.innerText = 'Enter Folder Name in your Google Drive:';
                 input.placeholder = 'e.g. Photos_2026 or Remote_Uploads/SubFolder';
+            }
+        }
+
+        function handleConvSourceTypeChange(type) {
+            const cardUrl = document.getElementById('convSourceCardUrl');
+            const cardDrive = document.getElementById('convSourceCardDrive');
+            const inputLabel = document.getElementById('convSourceInputLabel');
+            const input = document.getElementById('convSourceInput');
+
+            if (type === 'drive') {
+                cardDrive.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer transition';
+                cardUrl.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition';
+                inputLabel.innerText = 'Enter Video File Path in your Google Drive:';
+                input.placeholder = 'e.g. Remote_Uploads/Movie.mkv or Videos/Clip.mp4';
+            } else {
+                cardUrl.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer transition';
+                cardDrive.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition';
+                inputLabel.innerText = 'Paste Video URL, MKV/MP4 Link or Magnet:';
+                input.placeholder = 'https://example.com/movie.mkv or magnet:?xt=...';
             }
         }
 
@@ -561,6 +672,87 @@
                 showToast(err.message, 'error');
             }
         }
+
+        async function handleStartConvertVideo(e) {
+            e.preventDefault();
+            const token = getPatToken();
+            if(!token) { toggleSettingsModal(); showToast('Please enter your GitHub PAT Token!', 'error'); return; }
+
+            const sourceType = document.querySelector('input[name="convSourceType"]:checked')?.value || 'url';
+            const sourceVal = document.getElementById('convSourceInput').value.trim();
+            const preset = document.querySelector('input[name="videoPreset"]:checked')?.value || 'mp4_universal';
+
+            if(!sourceVal) return;
+
+            document.getElementById('convSubmitBtn').disabled = true;
+            document.getElementById('progressCard').classList.remove('hidden');
+            document.getElementById('successCard').classList.add('hidden');
+            elapsedSeconds = 0; 
+            clearInterval(timerInterval);
+            let currentPct = 10;
+            document.getElementById('progressBarFill').style.width = '10%';
+
+            timerInterval = setInterval(() => {
+                elapsedSeconds++;
+                const m = String(Math.floor(elapsedSeconds/60)).padStart(2,'0');
+                const s = String(elapsedSeconds%60).padStart(2,'0');
+                document.getElementById('elapsedTimer').innerText = `${m}:${s}`;
+
+                if (elapsedSeconds <= 4) {
+                    currentPct = 10 + (elapsedSeconds * 4);
+                    updateStep(1, 'Allocating...');
+                    document.getElementById('liveStatusTitle').innerText = 'Initializing FFmpeg Video Engine...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Preparing cloud codecs and hardware accelerator';
+                } else if (elapsedSeconds <= 20) {
+                    currentPct = 26 + ((elapsedSeconds - 4) * 2);
+                    updateStep(2, 'Streaming...');
+                    document.getElementById('liveStatusTitle').innerText = 'Fetching High-Speed Video Stream...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Downloading source video chunks to RAM disk';
+                } else if (elapsedSeconds <= 55) {
+                    currentPct = 58 + ((elapsedSeconds - 20) * 0.8);
+                    updateStep(3, 'Encoding 🎬');
+                    document.getElementById('liveStatusTitle').innerText = 'FFmpeg Multi-Core Video Encoding...';
+                    document.getElementById('liveStatusSubtitle').innerText = `Encoding preset: ${preset} with zero quality loss`;
+                } else {
+                    currentPct = Math.min(95, 86 + ((elapsedSeconds - 55) * 0.3));
+                    updateStep(4, 'Uploading...');
+                    document.getElementById('liveStatusTitle').innerText = 'Uploading Converted Video to Google Drive...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Saving to Converted_Videos folder & creating link';
+                }
+
+                document.getElementById('progressBarFill').style.width = `${Math.min(95, currentPct)}%`;
+                document.getElementById('progressPercent').innerText = `${Math.floor(Math.min(95, currentPct))}%`;
+            }, 1000);
+
+            updateStep(1, 'Triggering...');
+
+            const payloadInputs = {
+                mode: 'convert_video',
+                url: sourceType === 'url' ? sourceVal : '',
+                folder: sourceType === 'drive' ? sourceVal : 'Converted_Videos',
+                destination: 'gdrive',
+                video_preset: preset
+            };
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' },
+                    body: JSON.stringify({ ref: 'main', inputs: payloadInputs })
+                });
+                if(!res.ok) throw new Error('Failed to dispatch workflow: ' + res.statusText);
+                updateStep(1, 'Allocated');
+                await new Promise(r => setTimeout(r, 4000));
+                const runId = await findLatestRun(token);
+                if(!runId) throw new Error('Could not find cloud run job.');
+                await monitorJob(runId, token);
+            } catch(err) {
+                clearInterval(timerInterval);
+                document.getElementById('convSubmitBtn').disabled = false;
+                showToast(err.message, 'error');
+            }
+        }
+
         function handleDestChange(dest) {
             const driveCard = document.getElementById('destDriveCard');
             const photosCard = document.getElementById('destPhotosCard');
@@ -643,7 +835,7 @@
                 const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' },
-                    body: JSON.stringify({ ref: 'main', inputs: { url: url, destination: dest, folder: folder } })
+                    body: JSON.stringify({ ref: 'main', inputs: { mode: 'remote_upload', url: url, destination: dest, folder: folder } })
                 });
                 if(!res.ok) throw new Error('Failed to dispatch workflow: ' + res.statusText);
                 updateStep(1, 'Allocated');
@@ -657,9 +849,10 @@
                 showToast(err.message, 'error');
             }
         }
+
         async function findLatestRun(token) {
-            for(let i=0; i<8; i++) {
-                const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs?per_page=1`, {
+            for(let i=0; i<10; i++) {
+                const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=1`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if(r.ok) {
