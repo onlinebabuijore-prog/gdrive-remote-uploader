@@ -190,7 +190,7 @@
                         <label class="block text-xs font-semibold mb-1 text-slate-300">
                             <i class="fa-solid fa-file-zipper text-purple-400 mr-1"></i> Output .ZIP Filename (Optional):
                         </label>
-                        <input type="text" id="zipOutputName" placeholder="e.g. My_Archive.zip" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
+                        <input type="text" id="zipOutputName" placeholder="Leave empty for original folder name" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold mb-1 text-slate-300">
@@ -206,11 +206,11 @@
             </form>
         </div>
 
-        <!-- Tab 3: Cloud Video & Audio Converter -->
+        <!-- Tab 3: Cloud Video & Audio Studio -->
         <div id="converterTabContent" class="hidden glass-card rounded-2xl p-6 sm:p-8 shadow-2xl relative mb-8 border border-amber-500/30 glow-amber">
             <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-800 text-xs">
                 <span class="font-semibold text-amber-400 flex items-center gap-2">
-                    <span class="h-2 w-2 rounded-full bg-amber-400 animate-ping"></span> FFmpeg Cloud Video & Audio Converter
+                    <span class="h-2 w-2 rounded-full bg-amber-400 animate-ping"></span> FFmpeg Cloud Video Studio & Converter
                 </span>
                 <span class="text-slate-400">Zero PC CPU / GPU Usage</span>
             </div>
@@ -245,42 +245,77 @@
 
                 <div>
                     <label class="block text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Conversion Preset:
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Video Preset / Operation:
                     </label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-amber-500/60 cursor-pointer hover:border-amber-400 transition" id="presetCard1">
-                            <input type="radio" name="videoPreset" value="mp4_universal" checked class="accent-amber-500">
+                            <input type="radio" name="videoPreset" value="mp4_universal" checked onchange="handlePresetSelection('mp4_universal')" class="accent-amber-500">
                             <div>
-                                <p class="text-xs font-bold text-amber-400">🎬 Universal MP4 (H.264/AAC)</p>
-                                <p class="text-[10px] text-slate-400">Plays on all TVs, phones & web</p>
+                                <p class="text-xs font-bold text-amber-400">🎬 Universal MP4</p>
+                                <p class="text-[10px] text-slate-400">H.264/AAC for all devices</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard2">
-                            <input type="radio" name="videoPreset" value="compress_hevc" class="accent-amber-500">
+                            <input type="radio" name="videoPreset" value="compress_hevc" onchange="handlePresetSelection('compress_hevc')" class="accent-amber-500">
                             <div>
-                                <p class="text-xs font-bold text-slate-300">🗜️ HEVC / H.265 Compression</p>
-                                <p class="text-[10px] text-slate-400">50-70% file size reduction</p>
+                                <p class="text-xs font-bold text-slate-300">🗜️ HEVC Compress</p>
+                                <p class="text-[10px] text-slate-400">50-70% size reduction</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard3">
-                            <input type="radio" name="videoPreset" value="extract_mp3" class="accent-amber-500">
+                            <input type="radio" name="videoPreset" value="add_watermark" onchange="handlePresetSelection('add_watermark')" class="accent-amber-500">
                             <div>
-                                <p class="text-xs font-bold text-slate-300">🎵 Extract MP3 Audio (320kbps)</p>
-                                <p class="text-[10px] text-slate-400">Audio only from video/song</p>
+                                <p class="text-xs font-bold text-slate-300">🏷️ Add Watermark</p>
+                                <p class="text-[10px] text-slate-400">Channel / Brand name</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard4">
-                            <input type="radio" name="videoPreset" value="to_720p" class="accent-amber-500">
+                            <input type="radio" name="videoPreset" value="merge_videos" onchange="handlePresetSelection('merge_videos')" class="accent-amber-500">
                             <div>
-                                <p class="text-xs font-bold text-slate-300">📱 Scale to 720p HD MP4</p>
-                                <p class="text-[10px] text-slate-400">Lightweight mobile version</p>
+                                <p class="text-xs font-bold text-slate-300">🔗 Merge / Join Videos</p>
+                                <p class="text-[10px] text-slate-400">Combine multiple videos</p>
                             </div>
                         </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard5">
+                            <input type="radio" name="videoPreset" value="extract_mp3" onchange="handlePresetSelection('extract_mp3')" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300">🎵 Extract MP3 Audio</p>
+                                <p class="text-[10px] text-slate-400">320kbps pure audio</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-amber-400 transition" id="presetCard6">
+                            <input type="radio" name="videoPreset" value="to_720p" onchange="handlePresetSelection('to_720p')" class="accent-amber-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300">📱 Scale 720p HD</p>
+                                <p class="text-[10px] text-slate-400">Fast mobile video</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Watermark Options Box -->
+                    <div id="watermarkOptionsBox" class="hidden p-4 rounded-xl bg-dark-800/80 border border-amber-500/30 space-y-3">
+                        <p class="text-xs font-bold text-amber-400 flex items-center gap-1.5"><i class="fa-solid fa-tag"></i> Watermark Customization:</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-slate-300 mb-1">Watermark Text (Channel Name / Brand):</label>
+                                <input type="text" id="watermarkText" placeholder="e.g. @MyChannel or yoursite.com" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-300 mb-1">Position on Video:</label>
+                                <select id="watermarkPos" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500 bg-dark-900 text-slate-200">
+                                    <option value="bottom_right" selected>Bottom Right (Default)</option>
+                                    <option value="top_right">Top Right</option>
+                                    <option value="top_left">Top Left</option>
+                                    <option value="bottom_left">Bottom Left</option>
+                                    <option value="center">Center Overlay</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <button type="submit" id="convSubmitBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-base shadow-lg transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Convert Video & Upload to Google Drive
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Process Video & Upload to Google Drive
                 </button>
             </form>
         </div>
@@ -673,6 +708,27 @@
             }
         }
 
+        function handlePresetSelection(preset) {
+            const wmBox = document.getElementById('watermarkOptionsBox');
+            const convInput = document.getElementById('convSourceInput');
+            const convLabel = document.getElementById('convSourceInputLabel');
+            const sourceType = document.querySelector('input[name="convSourceType"]:checked')?.value || 'url';
+
+            if (preset === 'add_watermark') {
+                wmBox.classList.remove('hidden');
+            } else {
+                wmBox.classList.add('hidden');
+            }
+
+            if (preset === 'merge_videos') {
+                convLabel.innerText = sourceType === 'url' ? 'Paste Video URLs or Magnets separated by comma (,):' : 'Enter Video Paths in Google Drive separated by comma (,):';
+                convInput.placeholder = sourceType === 'url' ? 'https://example.com/part1.mp4, https://example.com/part2.mp4' : 'Remote_Uploads/Intro.mp4, Remote_Uploads/Main.mp4';
+            } else {
+                convLabel.innerText = sourceType === 'url' ? 'Paste Video URL, MKV/MP4 Link or Magnet:' : 'Enter Video File Path in your Google Drive:';
+                convInput.placeholder = sourceType === 'url' ? 'https://example.com/movie.mkv or magnet:?xt=...' : 'e.g. Remote_Uploads/Movie.mkv or Videos/Clip.mp4';
+            }
+        }
+
         async function handleStartConvertVideo(e) {
             e.preventDefault();
             const token = getPatToken();
@@ -681,6 +737,8 @@
             const sourceType = document.querySelector('input[name="convSourceType"]:checked')?.value || 'url';
             const sourceVal = document.getElementById('convSourceInput').value.trim();
             const preset = document.querySelector('input[name="videoPreset"]:checked')?.value || 'mp4_universal';
+            const wmText = document.getElementById('watermarkText')?.value.trim() || '';
+            const wmPos = document.getElementById('watermarkPos')?.value || 'bottom_right';
 
             if(!sourceVal) return;
 
@@ -710,13 +768,13 @@
                     document.getElementById('liveStatusSubtitle').innerText = 'Downloading source video chunks to RAM disk';
                 } else if (elapsedSeconds <= 55) {
                     currentPct = 58 + ((elapsedSeconds - 20) * 0.8);
-                    updateStep(3, 'Encoding 🎬');
-                    document.getElementById('liveStatusTitle').innerText = 'FFmpeg Multi-Core Video Encoding...';
-                    document.getElementById('liveStatusSubtitle').innerText = `Encoding preset: ${preset} with zero quality loss`;
+                    updateStep(3, 'Processing 🎬');
+                    document.getElementById('liveStatusTitle').innerText = 'FFmpeg Multi-Core Video Studio...';
+                    document.getElementById('liveStatusSubtitle').innerText = `Running operation: ${preset} with zero quality loss`;
                 } else {
                     currentPct = Math.min(95, 86 + ((elapsedSeconds - 55) * 0.3));
                     updateStep(4, 'Uploading...');
-                    document.getElementById('liveStatusTitle').innerText = 'Uploading Converted Video to Google Drive...';
+                    document.getElementById('liveStatusTitle').innerText = 'Uploading Processed Video to Google Drive...';
                     document.getElementById('liveStatusSubtitle').innerText = 'Saving to Converted_Videos folder & creating link';
                 }
 
@@ -731,7 +789,9 @@
                 url: sourceType === 'url' ? sourceVal : '',
                 folder: sourceType === 'drive' ? sourceVal : 'Converted_Videos',
                 destination: 'gdrive',
-                video_preset: preset
+                video_preset: preset,
+                watermark_text: wmText,
+                watermark_pos: wmPos
             };
 
             try {

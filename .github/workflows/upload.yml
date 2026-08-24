@@ -1,4 +1,4 @@
-﻿name: Cloud Remote Uploader, Zipper & Video Converter
+﻿name: Cloud Remote Uploader, Zipper & Video Studio
 
 on:
   workflow_dispatch:
@@ -8,14 +8,14 @@ on:
         required: false
         default: 'remote_upload'
       url:
-        description: 'Remote Download URL, Magnet Link, or Video URL'
+        description: 'Remote Download URL, Magnet Link, or Video URLs (comma separated for merge)'
         required: false
       destination:
         description: 'Destination: gdrive or gphotos'
         required: false
         default: 'gdrive'
       folder:
-        description: 'Target Folder / Source Folder / Album / Drive Video Path'
+        description: 'Target Folder / Source Folder / Album / Drive Video Path(s)'
         required: false
         default: 'Remote_Uploads'
       zip_name:
@@ -25,9 +25,17 @@ on:
         description: 'Optional Password'
         required: false
       video_preset:
-        description: 'Video Conversion Preset'
+        description: 'Video Preset: mp4_universal, compress_hevc, extract_mp3, to_720p, to_480p, add_watermark, merge_videos'
         required: false
         default: 'mp4_universal'
+      watermark_text:
+        description: 'Watermark Text to overlay'
+        required: false
+        default: ''
+      watermark_pos:
+        description: 'Watermark Position: bottom_right, top_right, top_left, bottom_left, center'
+        required: false
+        default: 'bottom_right'
 
 jobs:
   process:
@@ -49,7 +57,7 @@ jobs:
       - name: Install Aria2, Rclone, Zip, FFmpeg and Tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y aria2 curl wget zip p7zip-full ffmpeg python3-pip
+          sudo apt-get install -y aria2 curl wget zip p7zip-full ffmpeg fonts-freefont-ttf python3-pip
           pip3 install --break-system-packages gdown || pip3 install gdown || true
           curl https://rclone.org/install.sh | sudo bash
 
@@ -79,6 +87,10 @@ jobs:
           PRESET="${{ github.event.inputs.video_preset }}"
           if [ -z "$PRESET" ]; then PRESET="mp4_universal"; fi
 
+          WM_TEXT="${{ github.event.inputs.watermark_text }}"
+          WM_POS="${{ github.event.inputs.watermark_pos }}"
+          if [ -z "$WM_POS" ]; then WM_POS="bottom_right"; fi
+
           mkdir -p ./downloads
           mkdir -p ./to_zip
           mkdir -p ./converted
@@ -93,28 +105,41 @@ jobs:
           if [ "$MODE" = "zip_folder" ]; then
             echo "🗜️ Starting Google Drive Folder ZIP Pipeline..."
             
+            ORIGINAL_FOLDER_NAME=""
             if [[ "$URL" =~ drive\.google\.com ]]; then
               echo "Downloading Public Google Drive Folder: $URL"
               gdown --folder "$URL" -O ./to_zip/ || rclone copy --drive-shared-with-me "gdrive:" ./to_zip/ -P || true
+              ORIGINAL_FOLDER_NAME="Public_Drive_Folder"
             else
               echo "Copying from your own Google Drive: gdrive:$FOLDER"
               rclone copy "gdrive:$FOLDER" ./to_zip/ -P
+              ORIGINAL_FOLDER_NAME=$(basename "$FOLDER")
             fi
 
-            # Clean output zip name
+            # Auto-Naming with Suffix Collision Protection
             if [ -z "$ZIP_NAME" ]; then
-              CLEAN_NAME=$(basename "$FOLDER" | tr -cd '[:alnum:]_-')
-              if [ -z "$CLEAN_NAME" ] || [ "$CLEAN_NAME" = "Remote_Uploads" ]; then
-                CLEAN_NAME="Drive_Archive_$(date +'%Y%m%d_%H%M%S')"
+              CLEAN_FOLDER_NAME=$(echo "$ORIGINAL_FOLDER_NAME" | tr -cd '[:alnum:]_-')
+              if [ -z "$CLEAN_FOLDER_NAME" ]; then
+                CLEAN_FOLDER_NAME="Drive_Archive"
               fi
-              ZIP_NAME="${CLEAN_NAME}.zip"
+              ZIP_NAME="${CLEAN_FOLDER_NAME}.zip"
+
+              # Check if file with same name already exists in target destination
+              EXISTS=$(rclone ls "gdrive:Remote_Uploads/$ZIP_NAME" 2>/dev/null | head -n 1)
+              if [ ! -z "$EXISTS" ]; then
+                TIMESTAMP_SUFFIX=$(date +'%Y%m%d_%H%M%S')
+                ZIP_NAME="${CLEAN_FOLDER_NAME}_${TIMESTAMP_SUFFIX}.zip"
+                echo "File exists! Auto-appended suffix: $ZIP_NAME"
+              fi
             fi
+
             if [[ ! "$ZIP_NAME" =~ \.zip$ ]]; then
               ZIP_NAME="${ZIP_NAME}.zip"
             fi
 
-            echo "Compressing into: $ZIP_NAME"
+            echo "Compressing into archive: $ZIP_NAME"
             if [ ! -z "$ZIP_PASS" ]; then
+              echo "Applying password protection..."
               7z a -tzip -p"$ZIP_PASS" -mhe=on "./downloads/$ZIP_NAME" ./to_zip/*
             else
               cd ./to_zip
@@ -126,51 +151,111 @@ jobs:
             TARGET_UPLOAD_FOLDER="Remote_Uploads"
 
           elif [ "$MODE" = "convert_video" ]; then
-            echo "🎬 Starting Cloud Video Converter & Compressor..."
+            echo "🎬 Starting Cloud Video Studio Engine (FFmpeg)..."
             
-            # Fetch source video
-            if [ ! -z "$URL" ]; then
-              if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
-                echo "Downloading Video from Torrent / Magnet..."
-                aria2c --enable-dht=true --bt-enable-lpd=true --bt-max-peers=120 --seed-time=0 --max-overall-upload-limit=1K --bt-stop-timeout=300 -d ./downloads "$URL"
+            if [ "$PRESET" = "merge_videos" ]; then
+              echo "🔗 Processing Video Merge / Joiner..."
+              mkdir -p ./merge_parts
+              > concat_list.txt
+              
+              # Parse comma-separated inputs
+              RAW_INPUT="$URL"
+              if [ -z "$RAW_INPUT" ]; then RAW_INPUT="$FOLDER"; fi
+              
+              IFS=',' read -ra ADDR <<< "$RAW_INPUT"
+              idx=1
+              for item in "${ADDR[@]}"; do
+                trimmed=$(echo "$item" | xargs)
+                if [ ! -z "$trimmed" ]; then
+                  part_file="./merge_parts/part_${idx}.mp4"
+                  if [[ "$trimmed" =~ ^https?:// ]] || [[ "$trimmed" =~ ^magnet:\? ]]; then
+                    echo "Downloading part $idx: $trimmed"
+                    aria2c -x 8 -s 8 -d ./merge_parts -o "raw_${idx}" "$trimmed" || wget -O "$part_file" "$trimmed"
+                  else
+                    echo "Fetching part $idx from Google Drive: gdrive:$trimmed"
+                    rclone copy "gdrive:$trimmed" ./merge_parts/ -P
+                  fi
+                  # Normalize to mp4
+                  FOUND_PART=$(find ./merge_parts -type f -not -name "part_*.mp4" | head -n 1)
+                  if [ ! -z "$FOUND_PART" ]; then
+                    ffmpeg -i "$FOUND_PART" -vcodec libx264 -preset fast -acodec aac "$part_file" -y
+                    rm -f "$FOUND_PART"
+                  fi
+                  if [ -f "$part_file" ]; then
+                    echo "file '$(pwd)/$part_file'" >> concat_list.txt
+                    idx=$((idx+1))
+                  fi
+                fi
+              done
+
+              OUT_FILE="./converted/Merged_Video_$(date +'%Y%m%d_%H%M%S').mp4"
+              echo "Concatenating all video parts..."
+              cat concat_list.txt
+              ffmpeg -f concat -safe 0 -i concat_list.txt -c copy "$OUT_FILE" || ffmpeg -f concat -safe 0 -i concat_list.txt -vcodec libx264 -crf 21 -preset fast -acodec aac "$OUT_FILE"
+
+            else
+              # Fetch single source video
+              if [ ! -z "$URL" ]; then
+                if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
+                  echo "Downloading Video from Torrent / Magnet..."
+                  aria2c --enable-dht=true --bt-enable-lpd=true --bt-max-peers=120 --seed-time=0 --max-overall-upload-limit=1K --bt-stop-timeout=300 -d ./downloads "$URL"
+                else
+                  echo "Downloading Video from URL..."
+                  aria2c -x 16 -s 16 -k 1M -d ./downloads "$URL" || wget -P ./downloads "$URL"
+                fi
               else
-                echo "Downloading Video from URL..."
-                aria2c -x 16 -s 16 -k 1M -d ./downloads "$URL" || wget -P ./downloads "$URL"
+                echo "Fetching Video from Google Drive: gdrive:$FOLDER"
+                rclone copy "gdrive:$FOLDER" ./downloads/ -P
               fi
-            else
-              echo "Fetching Video from Google Drive: gdrive:$FOLDER"
-              rclone copy "gdrive:$FOLDER" ./downloads/ -P
-            fi
 
-            SRC_VIDEO=$(find ./downloads -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.avi" -o -name "*.mov" -o -name "*.webm" -o -name "*.flv" -o -name "*.ts" -o -name "*.m4v" \) | head -n 1)
-            if [ -z "$SRC_VIDEO" ]; then
-              SRC_VIDEO=$(ls -1 ./downloads | head -n 1)
-              SRC_VIDEO="./downloads/$SRC_VIDEO"
-            fi
-            echo "Source Video File: $SRC_VIDEO"
+              SRC_VIDEO=$(find ./downloads -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.avi" -o -name "*.mov" -o -name "*.webm" -o -name "*.flv" -o -name "*.ts" -o -name "*.m4v" \) | head -n 1)
+              if [ -z "$SRC_VIDEO" ]; then
+                SRC_VIDEO=$(ls -1 ./downloads | head -n 1)
+                SRC_VIDEO="./downloads/$SRC_VIDEO"
+              fi
+              echo "Source Video File: $SRC_VIDEO"
+              BASE_NAME=$(basename "$SRC_VIDEO" | sed 's/\.[^.]*$//')
 
-            BASE_NAME=$(basename "$SRC_VIDEO" | sed 's/\.[^.]*$//')
-            
-            if [ "$PRESET" = "extract_mp3" ]; then
-              OUT_FILE="./converted/${BASE_NAME}_Audio.mp3"
-              echo "Extracting MP3 Audio (320kbps)..."
-              ffmpeg -i "$SRC_VIDEO" -vn -ar 44100 -ac 2 -b:a 320k "$OUT_FILE"
-            elif [ "$PRESET" = "compress_hevc" ]; then
-              OUT_FILE="./converted/${BASE_NAME}_Compressed.mp4"
-              echo "Applying High-Efficiency HEVC/H.265 Video Compression..."
-              ffmpeg -i "$SRC_VIDEO" -vcodec libx265 -crf 26 -preset fast -acodec aac -b:a 128k "$OUT_FILE"
-            elif [ "$PRESET" = "to_720p" ]; then
-              OUT_FILE="./converted/${BASE_NAME}_720p.mp4"
-              echo "Scaling to 720p HD MP4..."
-              ffmpeg -i "$SRC_VIDEO" -vf "scale=-2:720" -vcodec libx264 -crf 22 -preset fast -acodec aac -b:a 192k "$OUT_FILE"
-            elif [ "$PRESET" = "to_480p" ]; then
-              OUT_FILE="./converted/${BASE_NAME}_480p.mp4"
-              echo "Scaling to 480p SD MP4..."
-              ffmpeg -i "$SRC_VIDEO" -vf "scale=-2:480" -vcodec libx264 -crf 24 -preset fast -acodec aac -b:a 128k "$OUT_FILE"
-            else
-              OUT_FILE="./converted/${BASE_NAME}_Converted.mp4"
-              echo "Converting to Universal MP4 (H.264/AAC)..."
-              ffmpeg -i "$SRC_VIDEO" -vcodec libx264 -crf 21 -preset fast -acodec aac -b:a 192k "$OUT_FILE"
+              if [ "$PRESET" = "add_watermark" ]; then
+                OUT_FILE="./converted/${BASE_NAME}_Watermarked.mp4"
+                echo "Applying Video Watermark: '$WM_TEXT' at position: $WM_POS"
+                
+                # Position coordinates
+                case "$WM_POS" in
+                  "top_left") POS_XY="x=30:y=30" ;;
+                  "top_right") POS_XY="x=w-tw-30:y=30" ;;
+                  "bottom_left") POS_XY="x=30:y=h-th-30" ;;
+                  "center") POS_XY="x=(w-tw)/2:y=(h-th)/2" ;;
+                  *) POS_XY="x=w-tw-30:y=h-th-30" ;; # default bottom_right
+                esac
+
+                ffmpeg -i "$SRC_VIDEO" -vf "drawtext=text='$WM_TEXT':fontcolor=white@0.85:fontsize=28:box=1:boxcolor=black@0.45:boxborderw=6:$POS_XY" -vcodec libx264 -crf 20 -preset fast -acodec copy "$OUT_FILE"
+
+              elif [ "$PRESET" = "extract_mp3" ]; then
+                OUT_FILE="./converted/${BASE_NAME}_Audio.mp3"
+                echo "Extracting MP3 Audio (320kbps)..."
+                ffmpeg -i "$SRC_VIDEO" -vn -ar 44100 -ac 2 -b:a 320k "$OUT_FILE"
+
+              elif [ "$PRESET" = "compress_hevc" ]; then
+                OUT_FILE="./converted/${BASE_NAME}_Compressed.mp4"
+                echo "Applying High-Efficiency HEVC/H.265 Video Compression..."
+                ffmpeg -i "$SRC_VIDEO" -vcodec libx265 -crf 26 -preset fast -acodec aac -b:a 128k "$OUT_FILE"
+
+              elif [ "$PRESET" = "to_720p" ]; then
+                OUT_FILE="./converted/${BASE_NAME}_720p.mp4"
+                echo "Scaling to 720p HD MP4..."
+                ffmpeg -i "$SRC_VIDEO" -vf "scale=-2:720" -vcodec libx264 -crf 22 -preset fast -acodec aac -b:a 192k "$OUT_FILE"
+
+              elif [ "$PRESET" = "to_480p" ]; then
+                OUT_FILE="./converted/${BASE_NAME}_480p.mp4"
+                echo "Scaling to 480p SD MP4..."
+                ffmpeg -i "$SRC_VIDEO" -vf "scale=-2:480" -vcodec libx264 -crf 24 -preset fast -acodec aac -b:a 128k "$OUT_FILE"
+
+              else
+                OUT_FILE="./converted/${BASE_NAME}_Converted.mp4"
+                echo "Converting to Universal MP4 (H.264/AAC)..."
+                ffmpeg -i "$SRC_VIDEO" -vcodec libx264 -crf 21 -preset fast -acodec aac -b:a 192k "$OUT_FILE"
+              fi
             fi
 
             rm -rf ./downloads/*
