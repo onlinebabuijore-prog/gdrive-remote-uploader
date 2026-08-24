@@ -87,7 +87,18 @@
         </div>
     </header>
     <main class="max-w-4xl mx-auto px-4 py-8 w-full flex-grow">
-        <div class="glass-card rounded-2xl p-6 sm:p-8 shadow-2xl relative mb-8">
+        <!-- Main Mode Tabs -->
+        <div class="flex gap-2 p-1.5 rounded-2xl bg-dark-800/90 border border-slate-800 mb-6 max-w-md mx-auto shadow-xl">
+            <button type="button" onclick="switchTab('uploader')" id="tabBtnUploader" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-lg transition">
+                <i class="fa-solid fa-bolt text-amber-300"></i> Remote Uploader
+            </button>
+            <button type="button" onclick="switchTab('zipper')" id="tabBtnZipper" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-transparent text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-file-zipper text-purple-400"></i> Drive Folder Zipper
+            </button>
+        </div>
+
+        <!-- Tab 1: Remote URL / Torrent Uploader -->
+        <div id="uploaderTabContent" class="glass-card rounded-2xl p-6 sm:p-8 shadow-2xl relative mb-8">
             <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-800 text-xs">
                 <span class="font-semibold text-emerald-400 flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span> Azure Gigabit Cloud (1Gbps+)</span>
                 <span class="text-slate-400">100% Free & Unlimited</span>
@@ -99,7 +110,7 @@
                             <i class="fa-solid fa-link text-emerald-400"></i> Remote URL or Magnet Link:
                             <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">HTTP / Torrent / Magnet</span>
                         </span>
-                        <button type="button" onclick="pasteFromClipboard()" class="text-xs text-emerald-400 hover:underline"><i class="fa-regular fa-paste"></i> Paste</button>
+                        <button type="button" onclick="pasteFromClipboard('remoteUrl')" class="text-xs text-emerald-400 hover:underline"><i class="fa-regular fa-paste"></i> Paste</button>
                     </label>
                     <input type="text" id="remoteUrl" required placeholder="https://example.com/file.zip or magnet:?xt=urn:btih:..." class="glass-input w-full px-4 py-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                 </div>
@@ -130,6 +141,64 @@
                 </div>
                 <button type="submit" id="submitBtn" class="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base shadow-lg glow-emerald transition flex items-center justify-center gap-2">
                     <i class="fa-solid fa-bolt text-amber-300"></i> Start Remote Upload to Google Drive
+                </button>
+            </form>
+        </div>
+
+        <!-- Tab 2: Google Drive Folder Zipper -->
+        <div id="zipperTabContent" class="hidden glass-card rounded-2xl p-6 sm:p-8 shadow-2xl relative mb-8 border border-purple-500/30 glow-purple">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-800 text-xs">
+                <span class="font-semibold text-purple-400 flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-purple-400 animate-ping"></span> Cloud Folder Compression Engine (7-Zip)
+                </span>
+                <span class="text-slate-400">Zero PC Bandwidth</span>
+            </div>
+
+            <form id="zipForm" onsubmit="handleStartZipFolder(event)" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-folder-open text-purple-400"></i> Google Drive Folder Source:
+                    </label>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-purple-500/60 cursor-pointer transition" id="zipSourceCardMy">
+                            <input type="radio" name="zipSourceType" value="mydrive" checked onchange="handleZipSourceTypeChange('mydrive')" class="accent-purple-500">
+                            <div>
+                                <p class="text-xs font-bold text-purple-400 flex items-center gap-1.5"><i class="fa-brands fa-google-drive"></i> My Drive Folder</p>
+                                <p class="text-[10px] text-slate-400">Folder inside your drive</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition" id="zipSourceCardPub">
+                            <input type="radio" name="zipSourceType" value="public" onchange="handleZipSourceTypeChange('public')" class="accent-purple-500">
+                            <div>
+                                <p class="text-xs font-bold text-slate-300 flex items-center gap-1.5"><i class="fa-solid fa-globe"></i> Public Folder Link</p>
+                                <p class="text-[10px] text-slate-400">Shared Google Drive URL</p>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-semibold text-slate-300" id="zipSourceInputLabel">Enter Folder Name in your Google Drive:</label>
+                        <button type="button" onclick="pasteFromClipboard('zipSourceInput')" class="text-xs text-purple-400 hover:underline"><i class="fa-regular fa-paste"></i> Paste</button>
+                    </div>
+                    <input type="text" id="zipSourceInput" required placeholder="e.g. Photos_2026 or Remote_Uploads/SubFolder" class="glass-input w-full px-4 py-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 text-slate-300">
+                            <i class="fa-solid fa-file-zipper text-purple-400 mr-1"></i> Output .ZIP Filename (Optional):
+                        </label>
+                        <input type="text" id="zipOutputName" placeholder="e.g. My_Archive.zip" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 text-slate-300">
+                            <i class="fa-solid fa-key text-amber-400 mr-1"></i> ZIP Password Protection (Optional):
+                        </label>
+                        <input type="password" id="zipPassword" placeholder="Leave empty for no password" class="glass-input w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    </div>
+                </div>
+
+                <button type="submit" id="zipSubmitBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-base shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-zipper"></i> Compress Folder to .ZIP & Upload to Drive
                 </button>
             </form>
         </div>
@@ -366,29 +435,130 @@
                 showToast('Please enter a valid token!', 'error');
             }
         }
-        function toggleSettingsModal() { document.getElementById('settingsModal').classList.toggle('hidden'); }
-        async function pasteFromClipboard() {
-            try { const text = await navigator.clipboard.readText(); if (text) document.getElementById('remoteUrl').value = text.trim(); } catch(e){}
+        function switchTab(tab) {
+            const btnUploader = document.getElementById('tabBtnUploader');
+            const btnZipper = document.getElementById('tabBtnZipper');
+            const contentUploader = document.getElementById('uploaderTabContent');
+            const contentZipper = document.getElementById('zipperTabContent');
+
+            if (tab === 'zipper') {
+                btnZipper.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-purple-600 text-white shadow-lg transition';
+                btnUploader.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-transparent text-slate-400 hover:text-white transition';
+                contentUploader.classList.add('hidden');
+                contentZipper.classList.remove('hidden');
+            } else {
+                btnUploader.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-lg transition';
+                btnZipper.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-transparent text-slate-400 hover:text-white transition';
+                contentZipper.classList.add('hidden');
+                contentUploader.classList.remove('hidden');
+            }
         }
-        function showToast(msg, type='info') {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-xs font-bold ${type==='success'?'bg-emerald-500 text-black':type==='error'?'bg-rose-500 text-white':'bg-slate-800 text-white'}`;
-            t.classList.remove('hidden');
-            setTimeout(() => t.classList.add('hidden'), 3000);
+
+        function handleZipSourceTypeChange(type) {
+            const cardMy = document.getElementById('zipSourceCardMy');
+            const cardPub = document.getElementById('zipSourceCardPub');
+            const inputLabel = document.getElementById('zipSourceInputLabel');
+            const input = document.getElementById('zipSourceInput');
+
+            if (type === 'public') {
+                cardPub.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-purple-500/60 cursor-pointer transition';
+                cardMy.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition';
+                inputLabel.innerText = 'Paste Public Google Drive Folder Link:';
+                input.placeholder = 'https://drive.google.com/drive/folders/1abc123...';
+            } else {
+                cardMy.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-purple-500/60 cursor-pointer transition';
+                cardPub.className = 'flex items-center gap-2.5 p-3 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer transition';
+                inputLabel.innerText = 'Enter Folder Name in your Google Drive:';
+                input.placeholder = 'e.g. Photos_2026 or Remote_Uploads/SubFolder';
+            }
         }
-        function copyToClipboard(id) {
-            const el = document.getElementById(id); el.select();
-            navigator.clipboard.writeText(el.value);
-            showToast('Link Copied to Clipboard!', 'success');
+
+        async function pasteFromClipboard(targetId = 'remoteUrl') {
+            try { 
+                const text = await navigator.clipboard.readText(); 
+                if (text && document.getElementById(targetId)) document.getElementById(targetId).value = text.trim(); 
+            } catch(e){}
         }
-        function updateStep(num, stateText) {
-            for(let i=1; i<=4; i++) {
-                const s = document.getElementById('step'+i);
-                const st = s.querySelector('.state');
-                if(i < num) { s.className = 'p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-400'; st.innerText = 'Done ✓'; }
-                else if(i === num) { s.className = 'p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 text-xs text-blue-400'; st.innerText = stateText; }
-                else { s.className = 'p-3 rounded-xl bg-dark-800 border border-slate-700 text-xs text-slate-300'; st.innerText = 'Waiting'; }
+
+        async function handleStartZipFolder(e) {
+            e.preventDefault();
+            const token = getPatToken();
+            if(!token) { toggleSettingsModal(); showToast('Please enter your GitHub PAT Token!', 'error'); return; }
+
+            const sourceType = document.querySelector('input[name="zipSourceType"]:checked')?.value || 'mydrive';
+            const sourceVal = document.getElementById('zipSourceInput').value.trim();
+            const zipName = document.getElementById('zipOutputName').value.trim();
+            const zipPass = document.getElementById('zipPassword').value.trim();
+
+            if(!sourceVal) return;
+
+            document.getElementById('zipSubmitBtn').disabled = true;
+            document.getElementById('progressCard').classList.remove('hidden');
+            document.getElementById('successCard').classList.add('hidden');
+            elapsedSeconds = 0; 
+            clearInterval(timerInterval);
+            let currentPct = 10;
+            document.getElementById('progressBarFill').style.width = '10%';
+
+            timerInterval = setInterval(() => {
+                elapsedSeconds++;
+                const m = String(Math.floor(elapsedSeconds/60)).padStart(2,'0');
+                const s = String(elapsedSeconds%60).padStart(2,'0');
+                document.getElementById('elapsedTimer').innerText = `${m}:${s}`;
+
+                if (elapsedSeconds <= 4) {
+                    currentPct = 10 + (elapsedSeconds * 4);
+                    updateStep(1, 'Connecting...');
+                    document.getElementById('liveStatusTitle').innerText = 'Accessing Google Drive Cloud Container...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Initializing high-speed file cloner & 7-Zip engine';
+                } else if (elapsedSeconds <= 18) {
+                    currentPct = 26 + ((elapsedSeconds - 4) * 2.5);
+                    updateStep(2, 'Cloning...');
+                    document.getElementById('liveStatusTitle').innerText = 'Cloning Google Drive Folder Files...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Fetching folder structure & data chunks';
+                } else if (elapsedSeconds <= 45) {
+                    currentPct = 60 + ((elapsedSeconds - 18) * 1);
+                    updateStep(3, 'Compressing...');
+                    document.getElementById('liveStatusTitle').innerText = 'Creating High-Compression .ZIP Archive...';
+                    document.getElementById('liveStatusSubtitle').innerText = '7-Zip multi-thread compression & optional encryption';
+                } else {
+                    currentPct = Math.min(95, 85 + ((elapsedSeconds - 45) * 0.4));
+                    updateStep(4, 'Uploading...');
+                    document.getElementById('liveStatusTitle').innerText = 'Uploading .ZIP Archive to Google Drive...';
+                    document.getElementById('liveStatusSubtitle').innerText = 'Saving compressed archive and generating share link';
+                }
+
+                document.getElementById('progressBarFill').style.width = `${Math.min(95, currentPct)}%`;
+                document.getElementById('progressPercent').innerText = `${Math.floor(Math.min(95, currentPct))}%`;
+            }, 1000);
+
+            updateStep(1, 'Triggering...');
+
+            const payloadInputs = {
+                mode: 'zip_folder',
+                url: sourceType === 'public' ? sourceVal : '',
+                folder: sourceType === 'mydrive' ? sourceVal : 'Remote_Uploads',
+                destination: 'gdrive',
+                zip_name: zipName,
+                zip_password: zipPass
+            };
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' },
+                    body: JSON.stringify({ ref: 'main', inputs: payloadInputs })
+                });
+                if(!res.ok) throw new Error('Failed to dispatch workflow: ' + res.statusText);
+                updateStep(1, 'Allocated');
+                await new Promise(r => setTimeout(r, 4000));
+                const runId = await findLatestRun(token);
+                if(!runId) throw new Error('Could not find cloud run job.');
+                await monitorJob(runId, token);
+            } catch(err) {
+                clearInterval(timerInterval);
+                document.getElementById('zipSubmitBtn').disabled = false;
+                showToast(err.message, 'error');
             }
         }
         function handleDestChange(dest) {

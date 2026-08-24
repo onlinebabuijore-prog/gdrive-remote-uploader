@@ -1,22 +1,32 @@
-﻿name: Remote URL to Google Drive & Google Photos
+﻿name: Cloud Remote Uploader & Drive Folder Zipper
 
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Operation Mode: remote_upload or zip_folder'
+        required: false
+        default: 'remote_upload'
       url:
-        description: 'Remote Download URL or Magnet Link'
-        required: true
+        description: 'Remote Download URL, Magnet Link, or Public Drive Folder Link'
+        required: false
       destination:
         description: 'Destination: gdrive or gphotos'
         required: false
         default: 'gdrive'
       folder:
-        description: 'Google Drive Folder Name or Google Photos Album'
+        description: 'Target Folder / Source Folder / Album Name'
         required: false
         default: 'Remote_Uploads'
+      zip_name:
+        description: 'Custom Output ZIP Name (Optional)'
+        required: false
+      zip_password:
+        description: 'Optional ZIP Password'
+        required: false
 
 jobs:
-  upload:
+  process:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,10 +42,11 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
 
-      - name: Install Aria2 and Rclone
+      - name: Install Aria2, Rclone, Zip and Tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y aria2 curl wget
+          sudo apt-get install -y aria2 curl wget zip p7zip-full python3-pip
+          pip3 install --break-system-packages gdown || pip3 install gdown || true
           curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure Rclone
@@ -46,71 +57,118 @@ jobs:
           echo "$RCLONE_B64" | base64 -d > ~/.config/rclone/rclone.conf
           rclone listremotes
 
-      - name: Download File, Torrent or Magnet from URL
+      - name: Execute Pipeline (Remote Download or Folder ZIP)
+        id: pipeline
         run: |
-          mkdir -p ./downloads
+          MODE="${{ github.event.inputs.mode }}"
+          if [ -z "$MODE" ]; then
+            MODE="remote_upload"
+          fi
+
           URL="${{ github.event.inputs.url }}"
-          echo "Starting high-speed download for: $URL"
-          
-          # Check if URL is a Magnet link or Torrent file
-          if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
-            echo "⚡ BitTorrent / Magnet Link detected!"
-            aria2c \
-              --enable-dht=true \
-              --bt-enable-lpd=true \
-              --bt-max-peers=120 \
-              --seed-time=0 \
-              --max-overall-upload-limit=1K \
-              --bt-stop-timeout=300 \
-              --summary-interval=5 \
-              -d ./downloads "$URL"
-          else
-            echo "⚡ Direct HTTP/HTTPS/FTP URL detected!"
-            if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
-              echo "Downloaded successfully with aria2c"
+          DEST="${{ github.event.inputs.destination }}"
+          if [ -z "$DEST" ]; then DEST="gdrive"; fi
+
+          FOLDER="${{ github.event.inputs.folder }}"
+          if [ -z "$FOLDER" ]; then FOLDER="Remote_Uploads"; fi
+
+          ZIP_NAME="${{ github.event.inputs.zip_name }}"
+          ZIP_PASS="${{ github.event.inputs.zip_password }}"
+
+          mkdir -p ./downloads
+          mkdir -p ./to_zip
+
+          echo "==========================================="
+          echo "Operation Mode: $MODE"
+          echo "Destination: $DEST"
+          echo "Folder / Param: $FOLDER"
+          echo "==========================================="
+
+          if [ "$MODE" = "zip_folder" ]; then
+            echo "🗜️ Starting Google Drive Folder ZIP Pipeline..."
+            
+            # Check if source is a public Drive URL or own Drive folder
+            if [[ "$URL" =~ drive\.google\.com ]]; then
+              echo "Downloading Public Google Drive Folder: $URL"
+              gdown --folder "$URL" -O ./to_zip/ || rclone copy --drive-shared-with-me "gdrive:" ./to_zip/ -P || true
             else
-              echo "aria2c failed, falling back to curl / wget..."
-              cd ./downloads
-              curl -L -O -J "$URL" || wget -c "$URL"
+              echo "Copying from your own Google Drive: gdrive:$FOLDER"
+              rclone copy "gdrive:$FOLDER" ./to_zip/ -P
+            fi
+
+            # Clean output zip name
+            if [ -z "$ZIP_NAME" ]; then
+              CLEAN_NAME=$(basename "$FOLDER" | tr -cd '[:alnum:]_-')
+              if [ -z "$CLEAN_NAME" ] || [ "$CLEAN_NAME" = "Remote_Uploads" ]; then
+                CLEAN_NAME="Drive_Archive_$(date +'%Y%m%d_%H%M%S')"
+              fi
+              ZIP_NAME="${CLEAN_NAME}.zip"
+            fi
+            if [[ ! "$ZIP_NAME" =~ \.zip$ ]]; then
+              ZIP_NAME="${ZIP_NAME}.zip"
+            fi
+
+            echo "Compressing into: $ZIP_NAME"
+            if [ ! -z "$ZIP_PASS" ]; then
+              echo "Applying password protection..."
+              7z a -tzip -p"$ZIP_PASS" -mhe=on "./downloads/$ZIP_NAME" ./to_zip/*
+            else
+              cd ./to_zip
+              zip -r -q "../downloads/$ZIP_NAME" .
               cd ..
             fi
+
+            ITEM_NAME="$ZIP_NAME"
+            TARGET_UPLOAD_FOLDER="Remote_Uploads"
+
+          else
+            echo "⚡ Starting Remote Download Pipeline..."
+            if [[ "$URL" =~ ^magnet:\? ]] || [[ "$URL" =~ \.torrent($|\?) ]]; then
+              echo "⚡ BitTorrent / Magnet Link detected!"
+              aria2c \
+                --enable-dht=true \
+                --bt-enable-lpd=true \
+                --bt-max-peers=120 \
+                --seed-time=0 \
+                --max-overall-upload-limit=1K \
+                --bt-stop-timeout=300 \
+                --summary-interval=5 \
+                -d ./downloads "$URL"
+            else
+              echo "⚡ Direct HTTP/HTTPS/FTP URL detected!"
+              if aria2c --async-dns=false -x 16 -s 16 -k 1M -j 4 --summary-interval=5 -d ./downloads "$URL"; then
+                echo "Downloaded successfully with aria2c"
+              else
+                echo "aria2c fallback to curl/wget..."
+                cd ./downloads
+                curl -L -O -J "$URL" || wget -c "$URL"
+                cd ..
+              fi
+            fi
+
+            ITEM_NAME=$(ls -1 ./downloads | head -n 1)
+            TARGET_UPLOAD_FOLDER="$FOLDER"
           fi
 
-      - name: Upload to Google Drive / Google Photos and Generate Public Link
-        id: cloud_upload
-        run: |
-          DEST="${{ github.event.inputs.destination }}"
-          if [ -z "$DEST" ]; then
-            DEST="gdrive"
-          fi
-
-          TARGET_FOLDER="${{ github.event.inputs.folder }}"
-          if [ -z "$TARGET_FOLDER" ]; then
-            TARGET_FOLDER="Remote_Uploads"
-          fi
-
-          echo "Selected Destination: $DEST"
-          echo "Target Folder / Album: $TARGET_FOLDER"
-
-          ITEM_NAME=$(ls -1 ./downloads | head -n 1)
           if [ -z "$ITEM_NAME" ]; then
-            echo "Error: No files downloaded!"
+            echo "Error: No files found to upload!"
             exit 1
           fi
 
-          echo "Processing item: $ITEM_NAME"
+          echo "Final Item to upload: $ITEM_NAME"
 
-          if [ "$DEST" = "gphotos" ]; then
-            echo "Uploading directly to Google Photos Album: $TARGET_FOLDER"
-            rclone copy "./downloads" "gphotos:album/$TARGET_FOLDER" -P || rclone copy "./downloads" "gphotos:upload" -P
+          # Upload to Cloud
+          if [ "$DEST" = "gphotos" ] && [ "$MODE" != "zip_folder" ]; then
+            echo "Uploading to Google Photos Album: $TARGET_UPLOAD_FOLDER"
+            rclone copy "./downloads" "gphotos:album/$TARGET_UPLOAD_FOLDER" -P || rclone copy "./downloads" "gphotos:upload" -P
             SHARE_LINK="https://photos.google.com/"
             DIRECT_LINK="https://photos.google.com/"
           else
-            echo "Uploading to Google Drive Folder: $TARGET_FOLDER"
-            rclone copy "./downloads" "gdrive:$TARGET_FOLDER" --drive-chunk-size 64M -P
-            SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER/$ITEM_NAME")
+            echo "Uploading to Google Drive Folder: $TARGET_UPLOAD_FOLDER"
+            rclone copy "./downloads" "gdrive:$TARGET_UPLOAD_FOLDER" --drive-chunk-size 64M -P
+            SHARE_LINK=$(rclone link "gdrive:$TARGET_UPLOAD_FOLDER/$ITEM_NAME")
             if [ -z "$SHARE_LINK" ]; then
-              SHARE_LINK=$(rclone link "gdrive:$TARGET_FOLDER")
+              SHARE_LINK=$(rclone link "gdrive:$TARGET_UPLOAD_FOLDER")
             fi
             
             FILE_ID=$(echo "$SHARE_LINK" | sed -n 's/.*id=\([^&]*\).*/\1/p')
@@ -128,19 +186,20 @@ jobs:
           echo "PUBLIC_LINK=$SHARE_LINK"
 
           # GitHub Job Summary
-          echo "## 🚀 Upload Completed Successfully!" >> $GITHUB_STEP_SUMMARY
-          echo "- **📁 Name:** \`$ITEM_NAME\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **🎯 Destination:** \`$DEST\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **📂 Target:** \`$TARGET_FOLDER\`" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Pipeline Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "- **📁 Output File:** \`$ITEM_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **⚙️ Mode:** \`$MODE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **📂 Target:** \`$TARGET_UPLOAD_FOLDER\`" >> $GITHUB_STEP_SUMMARY
           echo "- **🔗 Link:** [$SHARE_LINK]($SHARE_LINK)" >> $GITHUB_STEP_SUMMARY
 
           # Publish to result.json in repo
           cat <<EOF > result.json
           {
             "status": "success",
+            "mode": "$MODE",
             "destination": "$DEST",
             "filename": "$ITEM_NAME",
-            "folder": "$TARGET_FOLDER",
+            "folder": "$TARGET_UPLOAD_FOLDER",
             "share_link": "$SHARE_LINK",
             "direct_link": "$DIRECT_LINK",
             "timestamp": "$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
@@ -150,5 +209,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add result.json
-          git commit -m "Update upload result: $ITEM_NAME [skip ci]" || true
+          git commit -m "Update result: $ITEM_NAME [skip ci]" || true
           git push origin main || true
