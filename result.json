@@ -1,9 +1,10 @@
 {
   "status": "success",
+  "mode": "remote_upload",
   "destination": "gdrive",
-  "filename": "Foxit PDF Editor Pro 14.0.6.33584",
+  "filename": "README.md",
   "folder": "Remote_Uploads",
-  "share_link": "https://drive.google.com/open?id=1zrm4Y4G6VX_9g--5dLkH7BfRbvV2aLj-",
-  "direct_link": "https://drive.google.com/uc?id=1zrm4Y4G6VX_9g--5dLkH7BfRbvV2aLj-&export=download",
-  "timestamp": "2026-08-23 21:13:48 UTC"
+  "share_link": "https://drive.google.com/open?id=1_B0Iwph9iLeAsd4Yelrs2MF3YSwvG04G",
+  "direct_link": "https://drive.google.com/uc?id=1_B0Iwph9iLeAsd4Yelrs2MF3YSwvG04G&export=download",
+  "timestamp": "2026-08-26 18:37:33 UTC"
 }
