@@ -76,7 +76,8 @@
                     <p class="text-xs text-slate-400">Direct Remote URL to Google Drive (Zero PC Bandwidth)</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
+                <span id="patStatusBadge" class="text-xs font-semibold hidden sm:inline-block"></span>
                 <button onclick="lockDashboard()" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 border border-slate-700 text-slate-300 transition" title="Lock Dashboard">
                     <i class="fa-solid fa-lock text-rose-400"></i> Lock
                 </button>
@@ -475,6 +476,51 @@
         const REPO_NAME = 'gdrive-remote-uploader';
         const WORKFLOW_FILE = 'upload.yml';
         let timerInterval = null, elapsedSeconds = 0;
+
+        function toggleSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            if (modal) modal.classList.toggle('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            toast.innerText = message;
+            toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-xs font-bold text-white transition-all transform duration-300 ${
+                type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-rose-600' : 'bg-blue-600')
+            }`;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        function updateStep(stepNum, statusText) {
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`step${i}`);
+                if (!el) continue;
+                const stateSpan = el.querySelector('.state');
+                if (i < stepNum) {
+                    el.className = 'p-3 rounded-xl bg-dark-800 border border-emerald-500/60 text-xs text-emerald-400';
+                    if (stateSpan) stateSpan.innerText = 'Done ✓';
+                } else if (i === stepNum) {
+                    el.className = 'p-3 rounded-xl bg-dark-800 border border-brand-500 text-xs text-brand-300 animate-pulse';
+                    if (stateSpan) stateSpan.innerText = statusText;
+                } else {
+                    el.className = 'p-3 rounded-xl bg-dark-800 border border-slate-700 text-xs text-slate-400';
+                    if (stateSpan) stateSpan.innerText = 'Waiting';
+                }
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const input = document.getElementById(elementId);
+            if (input) {
+                input.select();
+                navigator.clipboard.writeText(input.value);
+                showToast('Link copied to clipboard!', 'success');
+            }
+        }
 
         const DEFAULT_PIN_HASH = "b4ee1f8347f181f4f9bb6ff4e5a7c633c4a8a2c37999fe95af8c8ff2e94f89cd"; // 993355
 
